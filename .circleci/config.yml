@@ -1,0 +1,15 @@
+version: 2.1
+jobs:
+  unit_tests:
+    docker:
+      - image: circleci/golang:1.12.4
+    steps:
+      - checkout
+      - run:
+          name: Zim Unit Tests
+          command: make test
+workflows:
+  version: 2
+  test:
+    jobs:
+      - unit_tests
