@@ -1,0 +1,705 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This stack supports Zim for application builds and management
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: '10.0.0.0/16'
+    PublicOne:
+      CIDR: '10.0.0.0/24'
+    PublicTwo:
+      CIDR: '10.0.1.0/24'
+    PrivateOne:
+      CIDR: '10.0.2.0/24'
+    PrivateTwo:
+      CIDR: '10.0.3.0/24'
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: zim
+    Description: A name for the service
+  PythonImage:
+    Type: String
+    Default: curtisfugue/python
+    Description: Python Docker image
+  GoImage:
+    Type: String
+    Default: curtisfugue/golang
+    Description: Golang Docker image
+  NodeImage:
+    Type: String
+    Default: curtisfugue/node
+    Description: Node Docker image
+  HaskellImage:
+    Type: String
+    Default: curtisfugue/haskell
+    Description: Node Docker image
+  ContainerCpu:
+    Type: Number
+    Default: 1024
+    Description: How much CPU to give the container. 1024 is 1 CPU
+  ContainerMemory:
+    Type: Number
+    Default: 8192
+    Description: How much memory in megabytes to give the container
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnetOneRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetTwoRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTable
+  NatGatewayOneAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayTwoAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayOne:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayOneAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetOne
+  NatGatewayTwo:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayTwoAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetTwo
+  PrivateRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteOne:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableOneAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      SubnetId: !Ref PrivateSubnetOne
+  PrivateRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteTwo:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayTwo
+  PrivateRouteTableTwoAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      SubnetId: !Ref PrivateSubnetTwo
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: "/aws/ecs/zim"
+      RetentionInDays: 30
+
+  TaskDefinitionGo:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: go
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Cpu: !Ref ContainerCpu
+          Memory: !Ref ContainerMemory
+          Image: !Ref GoImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: zim
+
+  TaskDefinitionPython:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: python
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Cpu: !Ref ContainerCpu
+          Memory: !Ref ContainerMemory
+          Image: !Ref PythonImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: zim
+
+  TaskDefinitionNode:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: node
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Cpu: !Ref ContainerCpu
+          Memory: !Ref ContainerMemory
+          Image: !Ref NodeImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: zim
+
+  TaskDefinitionHaskell:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: haskell
+      Cpu: !Ref ContainerCpu
+      Memory: !Ref ContainerMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: !Ref ServiceName
+          Cpu: !Ref ContainerCpu
+          Memory: !Ref ContainerMemory
+          Image: !Ref HaskellImage
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: zim
+
+  TaskDefinitionAthens:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: athens
+      Cpu: 512
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      TaskRoleArn: !Ref ECSTaskRole
+      ContainerDefinitions:
+        - Name: athens
+          Cpu: 512
+          Memory: 1024
+          Image: gomods/athens:v0.7.0
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: athens
+          PortMappings:
+            - ContainerPort: 3000
+          Environment:
+            - Name: AWS_ACCOUNT_ID
+              Value: !Ref "AWS::AccountId"
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: ATHENS_STORAGE_TYPE
+              Value: s3
+            - Name: ATHENS_S3_BUCKET_NAME
+              Value: !Join ['-', ['athens', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+            - Name: AWS_CREDENTIALS_ENDPOINT
+              Value: http://169.254.170.2
+
+  FargateContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Fargate containers
+      VpcId: !Ref 'VPC'
+      SecurityGroupIngress:
+        Description: Ingress from load balancer
+        CidrIp: !GetAtt VPC.CidrBlock
+        FromPort: 3000
+        ToPort: 3000
+        IpProtocol: tcp
+
+  # This is an IAM role which authorizes ECS to manage resources on your
+  # account on your behalf, such as updating your load balancer with the
+  # details of where your containers are, so that traffic can reach your
+  # containers.
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              # Rules which allow ECS to attach network interfaces to instances
+              # on your behalf in order for awsvpc networking mode to work right
+              - 'ec2:AttachNetworkInterface'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateNetworkInterfacePermission'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteNetworkInterfacePermission'
+              - 'ec2:Describe*'
+              - 'ec2:DetachNetworkInterface'
+
+              # Rules which allow ECS to update load balancers on your behalf
+              # with the information sabout how to send traffic to your containers
+              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+              - 'elasticloadbalancing:DeregisterTargets'
+              - 'elasticloadbalancing:Describe*'
+              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+              - 'elasticloadbalancing:RegisterTargets'
+            Resource: '*'
+
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs-tasks.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                # Allow the ECS Tasks to download images from ECR
+                - 'ecr:GetAuthorizationToken'
+                - 'ecr:BatchCheckLayerAvailability'
+                - 'ecr:GetDownloadUrlForLayer'
+                - 'ecr:BatchGetImage'
+                # Allow the ECS tasks to upload logs to CloudWatch
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Resource: '*'
+
+  ECSTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: zim-task-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+      Policies:
+      - PolicyName: S3Access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Sid: S3ObjectAccess
+            Effect: Allow
+            Action: "s3:*"
+            Resource:
+            - !Join [ "", [ "arn:aws:s3:::zim-", !Ref 'AWS::Region', "-", !Ref 'AWS::AccountId', "/*" ] ]
+            - !Join [ "", [ "arn:aws:s3:::athens-", !Ref 'AWS::Region', "-", !Ref 'AWS::AccountId', "/*" ] ]
+          - Sid: S3BucketAccess
+            Effect: Allow
+            Action: "s3:*"
+            Resource:
+            - !Join [ "", [ "arn:aws:s3:::zim-", !Ref 'AWS::Region', "-", !Ref 'AWS::AccountId' ] ]
+            - !Join [ "", [ "arn:aws:s3:::athens-", !Ref 'AWS::Region', "-", !Ref 'AWS::AccountId' ] ]
+      - PolicyName: KMSKeyAccess
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            Effect: Allow
+            Action:
+            - kms:Encrypt
+            - kms:Decrypt
+            - kms:GenerateDataKey
+            - kms:DescribeKey
+            Resource: !GetAtt Key.Arn
+      - PolicyName: SQSAccess
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            Effect: Allow
+            Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            Resource:
+            - !Join [ "", [ "arn:aws:sqs:", !Ref 'AWS::Region', ":", !Ref 'AWS::AccountId', ":*" ] ]
+
+  AthensService:
+    DependsOn: AthensListener
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: athens
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref FargateContainerSecurityGroup
+          Subnets:
+            - !Ref PrivateSubnetOne
+            - !Ref PrivateSubnetTwo
+      TaskDefinition: !Ref TaskDefinitionAthens
+      LoadBalancers:
+        - ContainerName: athens
+          ContainerPort: 3000
+          TargetGroupArn: !Ref AthensTargetGroup
+
+  AthensLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name: athens-load-balancer
+      Scheme: internal
+      Type: network
+      Subnets:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+      LoadBalancerAttributes:
+        - Key: load_balancing.cross_zone.enabled
+          Value: true
+      Tags:
+        - Key: Name
+          Value: Athens Load Balancer
+
+  AthensTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: athens-target-group
+      Port: 3000
+      Protocol: TCP
+      TargetType: ip
+      VpcId: !Ref 'VPC'
+      HealthCheckProtocol: TCP
+      HealthCheckIntervalSeconds: 10
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  AthensListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref AthensTargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref AthensLoadBalancer
+      Port: 3000
+      Protocol: TCP
+
+  Key:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Zim KMS Key
+      Enabled: true
+      EnableKeyRotation: false
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: 'zim-key-policy'
+        Statement:
+          - Sid: 'Enable IAM User Permissions'
+            Effect: 'Allow'
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: 'Allow GenerateDataKey'
+            Effect: 'Allow'
+            Principal:
+              Service: s3.amazonaws.com
+            Action:
+              - kms:GenerateDataKey*
+            Resource: '*'
+
+  KeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/fugue/zim
+      TargetKeyId: !Ref Key
+
+  ZimBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt Key.Arn
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: zim
+
+  AthensBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', ['athens', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt Key.Arn
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: zim
+
+  MessageQueueGo:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      KmsMasterKeyId: !Ref KeyAlias
+      MessageRetentionPeriod: 86400
+      QueueName: zim-go
+      ReceiveMessageWaitTimeSeconds: 10
+      VisibilityTimeout: 30
+
+  MessageQueuePython:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      KmsMasterKeyId: !Ref KeyAlias
+      MessageRetentionPeriod: 86400
+      QueueName: zim-python
+      ReceiveMessageWaitTimeSeconds: 10
+      VisibilityTimeout: 30
+
+  MessageQueueNode:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      KmsMasterKeyId: !Ref KeyAlias
+      MessageRetentionPeriod: 86400
+      QueueName: zim-node
+      ReceiveMessageWaitTimeSeconds: 10
+      VisibilityTimeout: 30
+
+  MessageQueueHaskell:
+    Type: AWS::SQS::Queue
+    Properties:
+      DelaySeconds: 0
+      KmsMasterKeyId: !Ref KeyAlias
+      MessageRetentionPeriod: 86400
+      QueueName: zim-haskell
+      ReceiveMessageWaitTimeSeconds: 10
+      VisibilityTimeout: 30
+
+Outputs:
+  ClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref 'ECSCluster'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ClusterName' ] ]
+  TaskDefinitionGo:
+    Description: The task definition
+    Value: !Ref 'TaskDefinitionGo'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'TaskDefinitionGo' ] ]
+  TaskDefinitionPython:
+    Description: The task definition
+    Value: !Ref 'TaskDefinitionPython'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'TaskDefinitionPython' ] ]
+  TaskDefinitionNode:
+    Description: The task definition
+    Value: !Ref 'TaskDefinitionNode'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'TaskDefinitionNode' ] ]
+  TaskDefinitionHaskell:
+    Description: The task definition
+    Value: !Ref 'TaskDefinitionHaskell'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'TaskDefinitionHaskell' ] ]
+  ECSRole:
+    Description: The ARN of the ECS role
+    Value: !GetAtt 'ECSRole.Arn'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ECSRole' ] ]
+  ECSTaskExecutionRole:
+    Description: The ARN of the ECS role
+    Value: !GetAtt 'ECSTaskExecutionRole.Arn'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ECSTaskExecutionRole' ] ]
+  VPCId:
+    Description: The ID of the VPC that this stack is deployed in
+    Value: !Ref 'VPC'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'VPCId' ] ]
+  PublicSubnetOne:
+    Description: Public subnet one
+    Value: !Ref 'PublicSubnetOne'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetOne' ] ]
+  PublicSubnetTwo:
+    Description: Public subnet two
+    Value: !Ref 'PublicSubnetTwo'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetTwo' ] ]
+  PrivateSubnetOne:
+    Description: Private subnet one
+    Value: !Ref 'PrivateSubnetOne'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetOne' ] ]
+  PrivateSubnetTwo:
+    Description: Private subnet two
+    Value: !Ref 'PrivateSubnetTwo'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetTwo' ] ]
+  FargateContainerSecurityGroup:
+    Description: A security group used to allow Fargate containers to receive traffic
+    Value: !Ref 'FargateContainerSecurityGroup'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'FargateContainerSecurityGroup' ] ]
+  BucketName:
+    Description: 'Name of the S3 Bucket'
+    Value: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', BucketName]]
+  AthensBucketName:
+    Description: 'Name of the S3 Bucket'
+    Value: !Join ['-', ['athens', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', AthensBucketName]]
+  MessageQueueGo:
+    Description: 'SQS Message Queue'
+    Value: !Ref MessageQueueGo
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', MessageQueueGo]]
+  MessageQueueNode:
+    Description: 'SQS Message Queue'
+    Value: !Ref MessageQueueNode
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', MessageQueueNode]]
+  MessageQueuePython:
+    Description: 'SQS Message Queue'
+    Value: !Ref MessageQueuePython
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', MessageQueuePython]]
+  MessageQueueHaskell:
+    Description: 'SQS Message Queue'
+    Value: !Ref MessageQueueHaskell
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', MessageQueueHaskell]]
+  AthensLoadBalancerName:
+    Description: Athens Load Balancer DNS Name
+    Value: !GetAtt AthensLoadBalancer.DNSName
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', AthensLoadBalancerName]]

@@ -1,0 +1,111 @@
+package project
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path"
+	"sort"
+	"strings"
+	"time"
+
+	uuid "github.com/satori/go.uuid"
+)
+
+// UUID returns a unique ID as a string
+func UUID() string {
+	id := uuid.NewV4()
+	return id.String()
+}
+
+// XDGCache returns the local cache directory
+func XDGCache() string {
+	value := os.Getenv("XDG_CACHE_HOME")
+	if value != "" {
+		return value
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return path.Join(home, ".cache")
+}
+
+func combineEnvironment(envs ...map[string]string) map[string]string {
+	result := map[string]string{}
+	for _, env := range envs {
+		if env != nil {
+			for k, v := range env {
+				result[k] = v
+			}
+		}
+	}
+	return result
+}
+
+func copyEnvironment(env map[string]string) map[string]string {
+	new := map[string]string{}
+	for k, v := range env {
+		new[k] = v
+	}
+	return new
+}
+
+func flattenEnvironment(env map[string]string) []string {
+	var index int
+	result := make([]string, len(env))
+	for k, v := range env {
+		result[index] = fmt.Sprintf("%s=%s", k, v)
+		index++
+	}
+	sort.Strings(result)
+	return result
+}
+
+func latestModification(files []string) (time.Time, error) {
+	if len(files) == 0 {
+		return time.Time{}, errors.New("No input files")
+	}
+	var latestMod time.Time
+	for _, fpath := range files {
+		info, err := os.Stat(fpath)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("Failed to stat %s: %s", fpath, err)
+		}
+		if info.ModTime().After(latestMod) {
+			latestMod = info.ModTime()
+		}
+	}
+	return latestMod, nil
+}
+
+func substituteVarsSlice(strings []string, variables map[string]string) []string {
+	if len(strings) == 0 || len(variables) == 0 {
+		return strings
+	}
+	result := make([]string, len(strings))
+	for i, s := range strings {
+		result[i] = substituteVars(s, variables)
+	}
+	return result
+}
+
+func substituteVars(s string, variables map[string]string) string {
+	if s == "" || len(variables) == 0 {
+		return s
+	}
+	// ${NAME}.zip -> foo.zip
+	for k, v := range variables {
+		s = strings.ReplaceAll(s, fmt.Sprintf("${%s}", k), v)
+	}
+	return s
+}
+
+func copyStrings(input []string) []string {
+	if input == nil {
+		return nil
+	}
+	result := make([]string, len(input))
+	copy(result, input)
+	return result
+}
