@@ -114,8 +114,7 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 		select {
 		case result := <-results:
 			ruleDone(result.Rule, result.Error)
-		// case <-time.After(20 * time.Millisecond):
-		case <-time.After(time.Second):
+		case <-time.After(20 * time.Millisecond):
 		}
 
 		// Pick rules in the graph that have no remaining "from" edges.
