@@ -70,7 +70,7 @@ clean:
 
 .PHONY: test
 test:
-	$(GO) test -v -cover ./project ./graph ./sched ./git ./cache
+	$(GO) test -v -cover ./project ./graph ./sched ./git ./cache ./format
 
 .PHONY: coverage
 coverage:
