@@ -103,6 +103,7 @@ func (s *s3Store) Put(ctx context.Context, key, src string, meta map[string]stri
 		Key:      aws.String(key),
 		Body:     f,
 		Metadata: metadata,
+		ACL:      aws.String("bucket-owner-full-control"),
 	})
 	if err != nil {
 		return fmt.Errorf("Failed to upload %s: %s", key, err)
