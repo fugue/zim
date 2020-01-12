@@ -1,3 +1,5 @@
+-include local-config.mk
+
 AWS_DEFAULT_REGION = us-east-2
 BINARY = zim
 INSTALLED_BINARY = /usr/local/bin/$(BINARY)
@@ -30,11 +32,7 @@ deploy: $(ZIM_CONFIG)
 $(ZIM_CONFIG_DIR):
 	mkdir -p $(ZIM_CONFIG_DIR)
 
-$(ZIM_CONFIG): $(ZIM_CONFIG_DIR) docker_images
-	docker push $(IMAGE_GO)
-	docker push $(IMAGE_PYTHON)
-	docker push $(IMAGE_NODE)
-	docker push $(IMAGE_HASKELL)
+$(ZIM_CONFIG): $(ZIM_CONFIG_DIR)
 	aws cloudformation deploy \
 		--region $(AWS_DEFAULT_REGION) \
 		--template-file fargate/cfn.yaml \
@@ -49,7 +47,8 @@ $(ZIM_CONFIG): $(ZIM_CONFIG_DIR) docker_images
 			NodeImage=$(IMAGE_NODE) \
 			HaskellImage=$(IMAGE_HASKELL) \
 			ContainerCpu=2048 \
-			ContainerMemory=8192
+			ContainerMemory=8192 \
+			BucketUsers=$(BUCKET_USERS)
 	AWS_DEFAULT_REGION=$(AWS_DEFAULT_REGION) fargate/config.sh > $@
 
 .PHONY: docker_images

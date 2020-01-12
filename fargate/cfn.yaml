@@ -42,6 +42,12 @@ Parameters:
     Type: Number
     Default: 8192
     Description: How much memory in megabytes to give the container
+  BucketUsers:
+    Type: String
+    Default: ""
+
+Conditions:
+  HasBucketUsers: !Not [!Equals [!Ref BucketUsers, ""]]
 
 Resources:
   VPC:
@@ -530,11 +536,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              KMSMasterKeyID: !GetAtt Key.Arn
-              SSEAlgorithm: aws:kms
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -543,6 +544,29 @@ Resources:
       Tags:
         - Key: Environment
           Value: zim
+
+  ZimBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: HasBucketUsers
+    Properties:
+      Bucket: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+      PolicyDocument:
+        Statement:
+          - Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+            Effect: 'Allow'
+            Resource:
+              - !Join [
+                  '',
+                  [
+                    'arn:aws:s3:::',
+                    !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']],
+                    '/*',
+                  ],
+                ]
+            Principal:
+              AWS: !Split [",", !Ref BucketUsers]
 
   AthensBucket:
     Type: AWS::S3::Bucket
