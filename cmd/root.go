@@ -34,6 +34,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceP("kinds", "k", nil, "Select kinds of components to operate on")
 	rootCmd.PersistentFlags().StringSliceP("components", "c", nil, "Select components to operate on by name")
 	rootCmd.PersistentFlags().StringSliceP("rules", "r", nil, "Rules to run against components")
+	rootCmd.PersistentFlags().String("cache-mode", "", "Cache mode (WRITE_ONLY)")
 
 	// Bind flags to environment variables if they are present
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
@@ -45,6 +46,7 @@ func init() {
 	viper.BindPFlag("kinds", rootCmd.PersistentFlags().Lookup("kinds"))
 	viper.BindPFlag("components", rootCmd.PersistentFlags().Lookup("components"))
 	viper.BindPFlag("rules", rootCmd.PersistentFlags().Lookup("rules"))
+	viper.BindPFlag("cache-mode", rootCmd.PersistentFlags().Lookup("cache-mode"))
 }
 
 // initConfig reads in config file and ENV variables if set.

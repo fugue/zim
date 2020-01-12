@@ -17,6 +17,16 @@ import (
 	"github.com/LuminalHQ/zim/store"
 )
 
+const WriteOnly = "WRITE_ONLY"
+
+// Error is used to handle cache misses and the like
+type Error string
+
+func (e Error) Error() string { return string(e) }
+
+// CacheMiss indicates the cache did not contain a match
+const CacheMiss = Error("Item not found in cache")
+
 // Entry carries the name and hash for one item within a Key
 type Entry struct {
 	Name string `json:"name"`
@@ -59,9 +69,11 @@ func (k *Key) Compute() error {
 }
 
 // NewMiddleware returns caching middleware
-func NewMiddleware(s store.Store) project.RunnerBuilder {
+func NewMiddleware(s store.Store, user, mode string) project.RunnerBuilder {
 
 	c := New(s)
+	c.user = user
+	c.mode = mode
 
 	return project.RunnerBuilder(func(runner project.Runner) project.Runner {
 		return project.RunnerFunc(func(ctx context.Context, r *project.Rule, opts project.RunOpts) (project.Code, error) {
@@ -73,9 +85,15 @@ func NewMiddleware(s store.Store) project.RunnerBuilder {
 				return runner.Run(ctx, r, opts)
 			}
 
-			// Download matching outputs from the cache if they exist
-			if _, err := c.Read(ctx, r); err == nil {
-				return project.Cached, nil // Cache hit!
+			if mode != WriteOnly {
+				// Download matching outputs from the cache if they exist
+				_, err := c.Read(ctx, r)
+				if err == nil {
+					return project.Cached, nil // Cache hit
+				}
+				if err != CacheMiss {
+					return project.Error, err // Cache error
+				}
 			}
 
 			// At this point, the outputs were not cached so build the rule
@@ -96,6 +114,8 @@ func NewMiddleware(s store.Store) project.RunnerBuilder {
 // Cache used to determine rule keys
 type Cache struct {
 	store store.Store
+	user  string
+	mode  string
 }
 
 // New returns a cache
@@ -186,29 +206,41 @@ func (c *Cache) Read(ctx context.Context, r *project.Rule) ([]string, error) {
 }
 
 func (c *Cache) put(ctx context.Context, key, src string) error {
+
+	// The file hash will be added to the cache item metadata
 	hash, err := HashFile(src)
 	if err != nil {
 		return err
 	}
-	meta := map[string]string{"Hash": hash}
+	meta := map[string]string{
+		"Hash": hash,
+		"User": c.user,
+	}
+
+	// Store the file in the cache
 	return c.store.Put(ctx, key, src, meta)
 }
 
 func (c *Cache) get(ctx context.Context, key, dst string) error {
 
-	if _, err := os.Stat(dst); err == nil {
-		localHash, err := HashFile(dst)
-		if err != nil {
-			return err
+	// Determine if the cache contains an item for the key
+	remoteInfo, err := c.store.Head(ctx, key)
+	if err != nil {
+		if _, ok := err.(store.NotFound); ok {
+			return CacheMiss
 		}
-		if info, err := c.store.Head(ctx, key); err == nil {
-			remoteHash := info.Meta["Hash"]
-			if remoteHash == localHash {
-				return nil
-			}
+		return err
+	}
+	remoteHash := remoteInfo.Meta["Hash"]
+
+	// If a local file exists that is identical to the one in the cache,
+	// then there is nothing to do
+	if localHash, err := HashFile(dst); err == nil {
+		if remoteHash == localHash {
+			return nil
 		}
 	}
-
+	// Download the file from the cache
 	return c.store.Get(ctx, key, dst)
 }
 

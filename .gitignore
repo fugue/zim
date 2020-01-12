@@ -1,3 +1,4 @@
 zim
 .mypy_cache/
 .vscode
+local-config.mk

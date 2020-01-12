@@ -44,6 +44,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		rules:        make(map[string]*Rule, len(self.Rules)),
 		exports:      make(map[string]*Export, len(self.Exports)),
 		env:          self.Environment,
+		// envTemplates: make(map[string]*pongo2.Template, len(self.Environment)),
 	}
 
 	for _, item := range self.Toolchain.Items {
@@ -77,6 +78,16 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		}
 		c.rules[name] = rule
 	}
+
+	// for k, v := range c.env {
+	// 	tmpl, err := pongo2.FromString(v)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	// fmt.Println("TMPL!", tmpl, k)
+	// 	c.envTemplates[k] = tmpl
+	// }
+
 	return &c, nil
 }
 
@@ -116,7 +127,8 @@ type Component struct {
 	rules        map[string]*Rule
 	exports      map[string]*Export
 	env          map[string]string
-	toolchain    Toolchain
+	// envTemplates map[string]*pongo2.Template
+	toolchain Toolchain
 }
 
 // Project returns the Project that contains this Component

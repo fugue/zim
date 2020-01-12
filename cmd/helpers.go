@@ -9,9 +9,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/LuminalHQ/zim/project"
-
 	"github.com/LuminalHQ/zim/git"
+	"github.com/LuminalHQ/zim/project"
 	"github.com/LuminalHQ/zim/store"
 	"github.com/spf13/viper"
 )
@@ -74,6 +73,7 @@ type zimOptions struct {
 	Rules      []string
 	Debug      bool
 	Jobs       int
+	CacheMode  string
 }
 
 func getZimOptions() zimOptions {
@@ -88,6 +88,7 @@ func getZimOptions() zimOptions {
 		UseDocker:  viper.GetBool("docker"),
 		Debug:      viper.GetBool("debug"),
 		Jobs:       viper.GetInt("jobs"),
+		CacheMode:  viper.GetString("cache-mode"),
 	}
 	if opts.Cache == "" {
 		opts.Cache = XDGCache()

@@ -11,9 +11,15 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 )
+
+// NotFound indicates an object does not exist
+type NotFound string
+
+func (e NotFound) Error() string { return string(e) }
 
 // Item in storage
 type Item struct {
@@ -67,6 +73,9 @@ func (s *s3Store) Get(ctx context.Context, key, dst string) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
+		if isNotFound(err) {
+			return NotFound(fmt.Sprintf("Not found: %s/%s", s.bucket, key))
+		}
 		return fmt.Errorf("Failed to get %s/%s: %s", s.bucket, key, err)
 	}
 
@@ -136,7 +145,11 @@ func (s *s3Store) Head(ctx context.Context, key string) (Item, error) {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return Item{}, fmt.Errorf("Failed to head key %s: %s", key, err)
+		if isNotFound(err) {
+			return Item{Key: key}, NotFound(fmt.Sprintf("Not found: %s/%s",
+				s.bucket, key))
+		}
+		return Item{Key: key}, fmt.Errorf("Head failed %s: %s", key, err)
 	}
 	item := Item{
 		Key:  key,
@@ -246,4 +259,14 @@ func fileStat(name string) (int64, time.Time) {
 		return 0, time.Time{}
 	}
 	return info.Size(), info.ModTime()
+}
+
+func isNotFound(err error) bool {
+	if aerr, ok := err.(awserr.Error); ok {
+		switch aerr.Code() {
+		case "NotFound":
+			return true
+		}
+	}
+	return false
 }

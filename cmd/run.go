@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"time"
 
@@ -89,7 +90,12 @@ func NewRunCommand() *cobra.Command {
 				project.Logger,
 			)
 			if objStore != nil {
-				builders = append(builders, cache.NewMiddleware(objStore))
+				self, err := user.Current()
+				if err != nil {
+					fatal(err)
+				}
+				builders = append(builders, cache.NewMiddleware(
+					objStore, self.Name, opts.CacheMode))
 			} else {
 				yellow := color.New(color.FgYellow).SprintFunc()
 				fmt.Fprintf(os.Stderr, yellow("Caching is not enabled. See the docs!\n"))
