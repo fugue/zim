@@ -9,9 +9,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/LuminalHQ/zim/sign"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -26,18 +28,6 @@ func init() {
 	logger.SetFormatter(&logrus.JSONFormatter{})
 }
 
-type event struct {
-	Method        string            `json:"method"`
-	Name          string            `json:"name"`
-	Metadata      map[string]string `json:"metadata"`
-	ContentLength int64             `json:"content_len"`
-}
-
-type output struct {
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
-}
-
 type eventHandler struct {
 	s3        s3iface.S3API
 	bucket    string
@@ -49,72 +39,85 @@ func (h *eventHandler) HandleRequest(ctx context.Context, req events.APIGatewayP
 
 	logger.WithField("req", req).Info("request")
 
-	if req.Path == "/sign" {
-		return h.HandleSignRequest(ctx, req)
-	}
-	return events.APIGatewayProxyResponse{Body: "unknown path", StatusCode: 404}, nil
-}
-
-func (h *eventHandler) HandleSignRequest(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-
 	principalID, ok := req.RequestContext.Authorizer["principalId"].(string)
 	if !ok || principalID == "" {
 		return events.APIGatewayProxyResponse{Body: "unknown principal", StatusCode: 401}, nil
 	}
 
-	var e event
-	if err := json.Unmarshal([]byte(req.Body), &e); err != nil {
+	var input sign.Input
+	if err := json.Unmarshal([]byte(req.Body), &input); err != nil {
 		logger.WithError(err).Error("Failed to unmarshal input")
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
-	logger.WithField("event", e).Info("Sign request")
 
-	output, err := h.Sign(ctx, e)
+	var err error
+	var output interface{}
+
+	if req.Path == "/sign" {
+		output, err = h.Sign(ctx, &input)
+	} else if req.Path == "/head" {
+		output, err = h.Head(ctx, &input)
+	} else {
+		return events.APIGatewayProxyResponse{Body: "unknown path", StatusCode: 404}, nil
+	}
+
 	if err != nil {
-		logger.WithError(err).Error("Failed to sign request")
+		logger.WithError(err).Info("Error handling request")
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
-	logger.WithField("response", output).Info("Signed OK")
 
-	resp, err := json.Marshal(output)
+	js, err := json.Marshal(output)
 	if err != nil {
-		logger.WithError(err).Error("Failed to marshal output")
+		logger.WithError(err).Info("Error marshaling repsonse")
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 500}, nil
 	}
-	return events.APIGatewayProxyResponse{Body: string(resp), StatusCode: 200}, nil
+
+	logger.WithFields(logrus.Fields{
+		"principal": principalID,
+		"resp":      string(js),
+		"err":       err,
+	}).Info("OK")
+
+	return events.APIGatewayProxyResponse{Body: string(js), StatusCode: 200}, nil
 }
 
-func (h *eventHandler) Sign(ctx context.Context, e event) (*output, error) {
+func (h *eventHandler) Sign(ctx context.Context, input *sign.Input) (*sign.Output, error) {
 
-	if e.Method != "GET" && e.Method != "PUT" {
-		return nil, fmt.Errorf("Invalid method: '%s'", e.Method)
+	if input.Method != "GET" && input.Method != "PUT" {
+		return nil, fmt.Errorf("Invalid method: '%s'", input.Method)
 	}
 
-	key := filepath.Join(h.prefix, e.Name)
+	key := filepath.Join(h.prefix, input.Name)
 
 	var s3Request *request.Request
-	if e.Method == "GET" {
+	if input.Method == "GET" {
 		s3Request, _ = h.s3.GetObjectRequest(&s3.GetObjectInput{
 			Bucket: aws.String(h.bucket),
 			Key:    aws.String(key),
 		})
 	} else {
 		metadata := map[string]*string{}
-		if e.Metadata != nil {
-			for k, v := range e.Metadata {
+		if input.Metadata != nil {
+			for k, v := range input.Metadata {
 				metadata[k] = aws.String(v)
 			}
 		}
+		logger.WithFields(logrus.Fields{
+			"bucket": h.bucket,
+			"key":    key,
+			"meta":   metadata,
+		}).Info("PutObjectRequest")
 		s3Request, _ = h.s3.PutObjectRequest(&s3.PutObjectInput{
-			Bucket:        aws.String(h.bucket),
-			Key:           aws.String(key),
-			Metadata:      metadata,
-			ContentLength: aws.Int64(e.ContentLength),
+			Bucket:   aws.String(h.bucket),
+			Key:      aws.String(key),
+			Metadata: metadata,
+			// ContentLength: aws.Int64(input.ContentLength),
 		})
 	}
 
 	url, signedHeaders, err := s3Request.PresignRequest(5 * time.Minute)
 	if err != nil {
+		logger.WithError(err).Info("Failed to sign request")
 		return nil, err
 	}
 
@@ -126,13 +129,49 @@ func (h *eventHandler) Sign(ctx context.Context, e event) (*output, error) {
 	}
 
 	logger.WithFields(logrus.Fields{
-		"method":  e.Method,
+		"method":  input.Method,
 		"bucket":  h.bucket,
 		"key":     key,
 		"headers": headers,
 	}).Info("Signed URL")
 
-	return &output{URL: url, Headers: headers}, nil
+	return &sign.Output{URL: url, Headers: headers}, nil
+}
+
+func (h *eventHandler) Head(ctx context.Context, input *sign.Input) (*sign.Item, error) {
+	key := filepath.Join(h.prefix, input.Name)
+	head, err := h.s3.HeadObjectWithContext(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(h.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		if isNotFound(err) {
+			return &sign.Item{Key: key}, nil
+		}
+		return nil, fmt.Errorf("Head failed %s: %s", key, err)
+	}
+	item := &sign.Item{
+		Key:      key,
+		Metadata: map[string]string{},
+	}
+	if head.VersionId != nil {
+		item.Version = *head.VersionId
+	}
+	if head.ETag != nil {
+		item.ETag = *head.ETag
+	}
+	if head.ContentLength != nil {
+		item.Size = *head.ContentLength
+	}
+	if head.LastModified != nil {
+		item.LastModified = *head.LastModified
+	}
+	if head.Metadata != nil {
+		for k, v := range head.Metadata {
+			item.Metadata[k] = *v
+		}
+	}
+	return item, nil
 }
 
 func main() {
@@ -164,4 +203,14 @@ func main() {
 		expireMin: expireMin,
 	}
 	lambda.Start(handler.HandleRequest)
+}
+
+func isNotFound(err error) bool {
+	if aerr, ok := err.(awserr.Error); ok {
+		switch aerr.Code() {
+		case "NotFound":
+			return true
+		}
+	}
+	return false
 }

@@ -64,7 +64,7 @@ func (h *authHandler) getToken(ctx context.Context, id string) (*token, error) {
 	result, err := h.ddb.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(h.table),
 		Key: map[string]*dynamodb.AttributeValue{
-			"token": {S: aws.String(id)},
+			"Token": {S: aws.String(id)},
 		},
 	})
 	if err != nil {
@@ -89,7 +89,7 @@ func generatePolicy(principalID, effect, resource string) events.APIGatewayCusto
 				{
 					Action:   []string{"execute-api:Invoke"},
 					Effect:   effect,
-					Resource: []string{resource},
+					Resource: []string{"*"},
 				},
 			},
 		}

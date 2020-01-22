@@ -11,6 +11,7 @@ import (
 	"github.com/LuminalHQ/zim/cache"
 	"github.com/LuminalHQ/zim/project"
 	"github.com/LuminalHQ/zim/sched"
+	"github.com/LuminalHQ/zim/store"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -61,7 +62,10 @@ func NewRunCommand() *cobra.Command {
 				fatal(err)
 			}
 
-			_, objStore := awsInit(opts)
+			var objStore store.Store
+			if opts.URL != "" {
+				objStore = store.NewHTTP(opts.URL)
+			}
 
 			// Load selected components from the project
 			proj, err := project.NewWithOptions(project.Opts{

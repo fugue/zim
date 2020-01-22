@@ -9,7 +9,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 
@@ -137,7 +136,7 @@ func (c *Cache) Write(ctx context.Context, r *project.Rule) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	storageKey := path.Join("cache", key.String())
+	storageKey := key.String()
 
 	var storagePaths []string
 	if len(outputs) == 1 {
@@ -163,7 +162,7 @@ func (c *Cache) Write(ctx context.Context, r *project.Rule) ([]string, error) {
 	}
 	defer os.Remove(keyPath)
 
-	infoKey := path.Join("cache", fmt.Sprintf("%s.json", key.String()))
+	infoKey := fmt.Sprintf("%s.json", key.String())
 	if err := c.put(ctx, infoKey, keyPath); err != nil {
 		return nil, err
 	}
@@ -185,7 +184,7 @@ func (c *Cache) Read(ctx context.Context, r *project.Rule) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	storageKey := path.Join("cache", key.String())
+	storageKey := key.String()
 
 	var storagePaths []string
 	if len(outputs) == 1 {

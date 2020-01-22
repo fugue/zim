@@ -9,7 +9,7 @@ GO = GO111MODULE=on go
 # Variables relating to the Zim CloudFormation stack
 STACK_NAME ?= zim
 AWS_REGION ?= us-east-2
-SIGNER_SOURCE = $(wildcard signer/*.go)
+SIGNER_SOURCE = $(wildcard signer/*.go sign/*.go)
 AUTH_SOURCE = $(wildcard auth/*.go)
 SIGNER_DIST = signer.zip
 AUTH_DIST = auth.zip
@@ -41,6 +41,7 @@ $(AUTH_DIST): $(AUTH_SOURCE)
 
 .PHONY: deploy
 deploy: $(SIGNER_DIST) $(AUTH_DIST)
+	# --guided
 	sam deploy \
 		--stack-name $(STACK_NAME) \
 		--no-fail-on-empty-changeset \

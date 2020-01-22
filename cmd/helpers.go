@@ -65,6 +65,7 @@ func downloadSource(ctx context.Context, objStore store.Store, key string) (stri
 type zimOptions struct {
 	Directory  string
 	Bucket     string
+	URL        string
 	Region     string
 	Cache      string
 	UseDocker  bool
@@ -80,6 +81,7 @@ func getZimOptions() zimOptions {
 	opts := zimOptions{
 		Directory:  viper.GetString("dir"),
 		Bucket:     viper.GetString("bucket"),
+		URL:        viper.GetString("url"),
 		Region:     viper.GetString("region"),
 		Cache:      viper.GetString("cache"),
 		Kinds:      viper.GetStringSlice("kinds"),
