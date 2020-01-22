@@ -25,10 +25,9 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	// Flags available to all subcommands
+	rootCmd.PersistentFlags().StringP("url", "u", "", "Zim API URL")
 	rootCmd.PersistentFlags().StringP("dir", "d", ".", "Working directory")
-	rootCmd.PersistentFlags().StringP("bucket", "b", "", "S3 bucket used for storage")
 	rootCmd.PersistentFlags().String("region", "us-east-2", "AWS region")
-	rootCmd.PersistentFlags().String("cache", "", "Local cache directory")
 	rootCmd.PersistentFlags().Bool("docker", false, "Use Docker when running rules")
 	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringSliceP("kinds", "k", nil, "Select kinds of components to operate on")
@@ -37,10 +36,9 @@ func init() {
 	rootCmd.PersistentFlags().String("cache-mode", "", "Cache mode (WRITE_ONLY)")
 
 	// Bind flags to environment variables if they are present
+	viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
 	viper.BindPFlag("dir", rootCmd.PersistentFlags().Lookup("dir"))
-	viper.BindPFlag("bucket", rootCmd.PersistentFlags().Lookup("bucket"))
 	viper.BindPFlag("region", rootCmd.PersistentFlags().Lookup("region"))
-	viper.BindPFlag("cache", rootCmd.PersistentFlags().Lookup("cache"))
 	viper.BindPFlag("docker", rootCmd.PersistentFlags().Lookup("docker"))
 	viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	viper.BindPFlag("kinds", rootCmd.PersistentFlags().Lookup("kinds"))

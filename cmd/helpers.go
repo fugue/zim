@@ -1,17 +1,13 @@
 package cmd
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 
 	"github.com/LuminalHQ/zim/git"
 	"github.com/LuminalHQ/zim/project"
-	"github.com/LuminalHQ/zim/store"
 	"github.com/spf13/viper"
 )
 
@@ -47,24 +43,8 @@ func getProject(dir string) (*project.Project, error) {
 	return project.New(absDir)
 }
 
-func downloadSource(ctx context.Context, objStore store.Store, key string) (string, error) {
-	if objStore == nil {
-		return "", errors.New("S3 bucket is not configured")
-	}
-	workspace, err := ioutil.TempDir("", "zim")
-	if err != nil {
-		return "", fmt.Errorf("Failed to create temp dir: %s", err)
-	}
-	err = git.DownloadExtractArchive(ctx, objStore, workspace, key)
-	if err != nil {
-		return "", fmt.Errorf("Failed to fetch source from %s: %s", key, err)
-	}
-	return workspace, nil
-}
-
 type zimOptions struct {
 	Directory  string
-	Bucket     string
 	URL        string
 	Region     string
 	Cache      string
@@ -80,7 +60,6 @@ type zimOptions struct {
 func getZimOptions() zimOptions {
 	opts := zimOptions{
 		Directory:  viper.GetString("dir"),
-		Bucket:     viper.GetString("bucket"),
 		URL:        viper.GetString("url"),
 		Region:     viper.GetString("region"),
 		Cache:      viper.GetString("cache"),
