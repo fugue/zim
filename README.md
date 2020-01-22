@@ -6,7 +6,7 @@ across a team by leveraging a shared cache of rule outputs. It is entirely
 language agnostic and has built-in support for cross-platform builds via Docker.
 
 Components and rules are defined in a YAML definitions that are conceptually
-similar to Makefiles. Components may inherit from a base definition, which
+similar to Makefiles. Each components may inherit from a base template, which
 yields a simple mechanism to build many components in a consistent and
 configurable manner.
 
@@ -27,7 +27,7 @@ Zim offers these advantages to teams developing in a monorepo:
  * Flexible input and output resource types. Currently Zim is able to work with
    both files and Docker images as natively supported resources.
 
- * Easy setup for the shared cache. Just point at an S3 bucket.
+ * Easy setup for a shared cache in S3 via an AWS CloudFormation stack.
 
  * Lightweight & easy to install. Zim is written in Go which means it
    consists of a single binary when built.
@@ -88,7 +88,7 @@ ahead to the *Getting Started* section below if you want to skate by for now.
 
 ## Getting Started
 
-Install Zim by cloning this repo and running `go install` at the top level.
+Install the Zim CLI by cloning this repo and running `go install` at the top level.
 Run `zim -h` to see help regarding available commands and flags. Zim recognizes
 when it is run within a Git repository and will automatically discover
 `component.yaml` files within, which define components and their rules.
@@ -120,20 +120,37 @@ rule: myservice.build in 1.347 sec [OK]
 The outputs - an executable named `myservice` in this case - are stored in an
 `artifacts` directory located at the root level of the repository.
 
-## Enabling Caching
+## Creating the Cache
 
-Currently AWS S3 is the supported storage backend for the Zim cache. Once
-the AWS region and S3 bucket name are specified, Zim automatically stores
-and loads artifacts (rule outputs) from the cache during execution. The entire
-team and the CI/CD system should share the same cache in order to gain the
-most benefits.
+Currently Zim supports using AWS S3 for its cache backend. The S3 bucket and
+a handful of other serverless infrastructure is easily provisioned by using
+[SAM](https://github.com/awslabs/aws-sam-cli).
 
-Zim uses [Viper](https://github.com/spf13/viper) for configuration and
-consequently supports several ways to specify the region and bucket.
+Prerequisites:
 
-1. Environment variables `ZIM_REGION` and `ZIM_BUCKET`
-2. Command line flags `--region` and `--bucket`
-3. Adding `region:` and `bucket:` entries to `~/.zim.yaml`
+ * Install the AWS CLI: `pip install awscli`
+ * Install the SAM CLI: `pip install aws-sam-cli`
+ * Install Go to build Lambdas: `brew install go`
+
+With those dependencies installed, run the following to provision cache
+infrastructure in AWS:
+
+```
+make deploy
+```
+
+When the deploy completes, the URL of your Zim API is printed. This URL should
+be saved to `~/.zim.yaml` as described in the following section.
+
+## Enabling the Cache in the CLI
+
+Create the file `~/.zim.yaml` with the following contents:
+
+```
+url: "URL_FROM_MAKE_DEPLOY"
+```
+
+Alternatively, you can set the URL via the `ZIM_URL` environment variable.
 
 With caching enabled, running the example from the Getting Started section
 again should result in output like:
@@ -144,8 +161,16 @@ rule: myservice.build
 rule: myservice.build [CACHED]
 ```
 
-Zim uses the AWS SDK for Go and reads AWS credentials according to the standard
-pattern, including via environment variables, `~/.aws/credentials`, and so on.
+## Cache Authentication
+
+Run the following command to create a new cache authentication token for each
+member of the team:
+
+```
+zim add token --email "joe@example.com" --name "Joe"
+```
+
+Save the token as an environment variable `ZIM_TOKEN`.
 
 ## Running Rules in Docker
 
@@ -308,3 +333,4 @@ Here are the most commonly used commands.
  * `zim list components` - shows Components in the Project
  * `zim list inputs -c myservice` - shows inputs used by a Component
  * `zim list env` - shows Zim Viper configuration
+ * `zim add token` - create a new authentication token
