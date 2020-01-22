@@ -1,7 +1,0 @@
-FROM circleci/golang:1.12.4
-
-RUN mkdir -p ~/.cache
-
-COPY zim_linux /usr/bin/zim
-
-ENTRYPOINT ["/usr/bin/zim", "slave"]

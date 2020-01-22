@@ -1,0 +1,214 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Zim Build System
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Tracing: Active
+    Runtime: go1.x
+Parameters:
+  LogRetentionInDays:
+    Description: Number of days to retain lambda log messages
+    Type: String
+    Default: "30"
+Resources:
+  Key:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Zim KMS Key
+      Enabled: true
+      EnableKeyRotation: false
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: 'zim-key-policy'
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: 'Allow'
+          Principal:
+            AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+          Action: 'kms:*'
+          Resource: '*'
+        - Sid: Allow GenerateDataKey
+          Effect: 'Allow'
+          Principal:
+            Service: s3.amazonaws.com
+          Action:
+          - kms:GenerateDataKey*
+          Resource: '*'
+  KeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/fugue/zim
+      TargetKeyId: !Ref Key
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !GetAtt Key.Arn
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: zim
+  SignerLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      - "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+      Policies:
+      - PolicyName: S3Access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject*
+            - s3:PutObject*
+            Resource:
+            - !Join [
+                '',
+                [
+                  'arn:aws:s3:::',
+                  !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']],
+                  '/*',
+                ],
+              ]
+      - PolicyName: KMSKeyAccess
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            Effect: Allow
+            Action:
+            - kms:Encrypt
+            - kms:Decrypt
+            - kms:GenerateDataKey
+            - kms:DescribeKey
+            Resource: !GetAtt Key.Arn
+  SignerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: zim-signer
+      CodeUri: signer.zip
+      Handler: ./signer_lambda
+      Role: !GetAtt SignerLambdaRole.Arn
+      Environment:
+        Variables:
+          BUCKET: !Sub "${Bucket}"
+          BUCKET_PREFIX: cache
+      Tags:
+        Environment: zim
+      Events:
+        GetRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref Api
+            Path: "/{proxy+}"
+            Method: ANY
+  SignerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${SignerFunction}"
+      RetentionInDays: !Ref LogRetentionInDays
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: ZimAuthorizer
+        Authorizers:
+          ZimAuthorizer:
+            FunctionArn: !GetAtt AuthFunction.Arn
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: zim-auth
+      CodeUri: auth.zip
+      Handler: ./auth_lambda
+      Role: !GetAtt AuthLambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE: !Sub "${AuthTokenTable}"
+      Tags:
+        Environment: zim
+  AuthLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      - "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+      Policies:
+      - PolicyName: DynamoDBAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:GetItem
+            Resource:
+            - !GetAtt AuthTokenTable.Arn
+      - PolicyName: KMSKeyAccess
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            Effect: Allow
+            Action:
+            - kms:Decrypt
+            - kms:GenerateDataKey
+            - kms:DescribeKey
+            Resource: !GetAtt Key.Arn
+  AuthLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AuthFunction}"
+      RetentionInDays: !Ref LogRetentionInDays
+  AuthTokenTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuthTokens
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        KMSMasterKeyId: !GetAtt Key.Arn
+        SSEEnabled: true
+        SSEType: KMS
+      AttributeDefinitions:
+      - AttributeName: Token
+        AttributeType: S
+      KeySchema:
+      - AttributeName: Token
+        KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+Outputs:
+  Bucket:
+    Description: Zim bucket name
+    Value: !Join ['-', ['zim', !Ref 'AWS::Region', !Ref 'AWS::AccountId']]
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', ZimBucket]]
+  Api:
+    Description: URL of the Zim API
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', Api]]
