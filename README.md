@@ -172,6 +172,18 @@ zim add token --email "joe@example.com" --name "Joe"
 
 Save the token as an environment variable `ZIM_TOKEN`.
 
+## Cache Mode
+
+You can optionally set the Zim CLI cache mode so that it only writes to the
+cache and doesn't read. This may be useful for use in automated builds that
+should populate the cache but not read from it.
+
+To use this feature, set `cache-mode` in `~/.zim.yaml` as follows:
+
+```
+cache-mode: WRITE_ONLY
+```
+
 ## Running Rules in Docker
 
 To automatically run rules inside a Docker container, instead of on the host
