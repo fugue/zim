@@ -74,19 +74,7 @@ func NewShowKeyCommand() *cobra.Command {
 				fatal(fmt.Errorf("Unknown rule: %s.%s", componentName, ruleName))
 			}
 
-			if opts.Region == "" {
-				fatal(errors.New("Must specify region"))
-			}
-			if opts.Bucket == "" {
-				fatal(errors.New("Must specify bucket"))
-			}
-
-			sess, err := getSession(opts.Region)
-			if err != nil {
-				fatal(err)
-			}
-			zimCache := cache.New(getStore(sess, opts.Bucket))
-
+			zimCache := cache.New(nil)
 			key, err := zimCache.Key(r)
 			if err != nil {
 				fatal(err)

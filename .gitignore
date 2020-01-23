@@ -1,3 +1,8 @@
 zim
 .mypy_cache/
 .vscode
+local-config.mk
+cfn_deploy.yaml
+signer.zip
+auth.zip
+samconfig.toml

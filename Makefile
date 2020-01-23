@@ -1,16 +1,24 @@
-AWS_DEFAULT_REGION = us-east-2
+-include local-config.mk
+
+# Variables relevant for the Zim CLI
 BINARY = zim
 INSTALLED_BINARY = /usr/local/bin/$(BINARY)
-LINUX_BINARY = zim_linux
 SOURCE = $(wildcard *.go) $(wildcard */*.go) $(wildcard cloud/*/*.go)
 GO = GO111MODULE=on go
-ZIM_CONFIG_DIR = $$HOME/.zim
-ZIM_CONFIG = $(ZIM_CONFIG_DIR)/config.json
 
-IMAGE_GO = curtisfugue/golang
-IMAGE_PYTHON = curtisfugue/python
-IMAGE_NODE = curtisfugue/node
-IMAGE_HASKELL = curtisfugue/haskell
+# Variables relating to the Zim CloudFormation stack
+STACK_NAME ?= zim
+AWS_REGION ?= us-east-2
+SIGNER_SOURCE = $(wildcard signer/*.go sign/*.go)
+AUTH_SOURCE = $(wildcard auth/*.go)
+SIGNER_DIST = signer.zip
+AUTH_DIST = auth.zip
+
+API_URL = $(shell aws cloudformation describe-stacks \
+	--region $(AWS_REGION) \
+	--stack-name $(STACK_NAME) \
+	--query 'Stacks[0].Outputs[?OutputKey==`Api`].OutputValue' \
+	--output text)
 
 $(BINARY): $(SOURCE)
 	$(GO) build -v -o $(BINARY)
@@ -21,52 +29,31 @@ install: $(INSTALLED_BINARY)
 $(INSTALLED_BINARY): $(BINARY)
 	cp $(BINARY) $@
 
-$(LINUX_BINARY): $(SOURCE)
-	GOOS=linux GOARCH=amd64 $(GO) build -ldflags="-s -w" -o zim_linux
+$(SIGNER_DIST): $(SIGNER_SOURCE)
+	GOOS=linux GOARCH=amd64 $(GO) build -ldflags="-s -w" -o signer_lambda ./signer
+	zip $@ signer_lambda
+	rm signer_lambda
+
+$(AUTH_DIST): $(AUTH_SOURCE)
+	GOOS=linux GOARCH=amd64 $(GO) build -ldflags="-s -w" -o auth_lambda ./auth
+	zip $@ auth_lambda
+	rm auth_lambda
 
 .PHONY: deploy
-deploy: $(ZIM_CONFIG)
-
-$(ZIM_CONFIG_DIR):
-	mkdir -p $(ZIM_CONFIG_DIR)
-
-$(ZIM_CONFIG): $(ZIM_CONFIG_DIR) docker_images
-	docker push $(IMAGE_GO)
-	docker push $(IMAGE_PYTHON)
-	docker push $(IMAGE_NODE)
-	docker push $(IMAGE_HASKELL)
-	aws cloudformation deploy \
-		--region $(AWS_DEFAULT_REGION) \
-		--template-file fargate/cfn.yaml \
-		--capabilities CAPABILITY_NAMED_IAM \
+deploy: $(SIGNER_DIST) $(AUTH_DIST)
+	# --guided
+	sam deploy \
+		--stack-name $(STACK_NAME) \
 		--no-fail-on-empty-changeset \
-		--stack-name zim \
-		--parameter-overrides \
-			ServiceName=zim \
-			StackName=zim \
-			GoImage=$(IMAGE_GO) \
-			PythonImage=$(IMAGE_PYTHON) \
-			NodeImage=$(IMAGE_NODE) \
-			HaskellImage=$(IMAGE_HASKELL) \
-			ContainerCpu=2048 \
-			ContainerMemory=8192
-	AWS_DEFAULT_REGION=$(AWS_DEFAULT_REGION) fargate/config.sh > $@
-
-.PHONY: docker_images
-docker_images: $(LINUX_BINARY)
-	docker build -t $(IMAGE_GO) -f fargate/Dockerfile.go .
-	docker build -t $(IMAGE_PYTHON) -f fargate/Dockerfile.python .
-	docker build -t $(IMAGE_NODE) -f fargate/Dockerfile.node .
-	docker build -t $(IMAGE_HASKELL) -f fargate/Dockerfile.haskell .
+		--region $(AWS_REGION)
+	@echo $(API_URL)
 
 .PHONY: clean
 clean:
 	rm -f cmp/cmp
 	rm -f coverage.out
 	rm -f $(BINARY)
-	rm -f $(LINUX_BINARY)
-	rm -f fargate/config.json
-	docker rmi -f $(IMAGE_GO) $(IMAGE_PYTHON) $(IMAGE_NODE) $(IMAGE_HASKELL)
+	rm -f $(SIGNER_DIST) $(AUTH_DIST)
 
 .PHONY: test
 test:

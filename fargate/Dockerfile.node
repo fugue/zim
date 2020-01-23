@@ -1,7 +1,0 @@
-FROM lambci/lambda:build-nodejs10.x
-
-RUN mkdir -p ~/.cache
-
-COPY zim_linux /usr/bin/zim
-
-ENTRYPOINT ["/usr/bin/zim", "slave"]

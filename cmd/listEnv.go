@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"sort"
 
 	"github.com/LuminalHQ/zim/format"
 	"github.com/fatih/structs"
@@ -26,14 +25,9 @@ var listEnvCmd = &cobra.Command{
 		}
 
 		fields := structs.Map(getZimOptions())
-		var names []string
-		for k := range fields {
-			names = append(names, k)
-		}
-		sort.Strings(names)
 
 		var rows []interface{}
-		for _, k := range names {
+		for _, k := range []string{"URL", "Region", "Debug", "Jobs", "UseDocker"} {
 			rows = append(rows, listEnvViewItem{Key: k, Value: fields[k]})
 		}
 

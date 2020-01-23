@@ -77,6 +77,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		}
 		c.rules[name] = rule
 	}
+
 	return &c, nil
 }
 

@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/user"
 	"path/filepath"
 	"time"
 
 	"github.com/LuminalHQ/zim/cache"
 	"github.com/LuminalHQ/zim/project"
 	"github.com/LuminalHQ/zim/sched"
+	"github.com/LuminalHQ/zim/store"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -60,7 +62,10 @@ func NewRunCommand() *cobra.Command {
 				fatal(err)
 			}
 
-			_, objStore := awsInit(opts)
+			var objStore store.Store
+			if opts.URL != "" {
+				objStore = store.NewHTTP(opts.URL)
+			}
 
 			// Load selected components from the project
 			proj, err := project.NewWithOptions(project.Opts{
@@ -89,7 +94,12 @@ func NewRunCommand() *cobra.Command {
 				project.Logger,
 			)
 			if objStore != nil {
-				builders = append(builders, cache.NewMiddleware(objStore))
+				self, err := user.Current()
+				if err != nil {
+					fatal(err)
+				}
+				builders = append(builders, cache.NewMiddleware(
+					objStore, self.Name, opts.CacheMode))
 			} else {
 				yellow := color.New(color.FgYellow).SprintFunc()
 				fmt.Fprintf(os.Stderr, yellow("Caching is not enabled. See the docs!\n"))
