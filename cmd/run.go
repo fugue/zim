@@ -64,7 +64,7 @@ func NewRunCommand() *cobra.Command {
 
 			var objStore store.Store
 			if opts.URL != "" {
-				objStore = store.NewHTTP(opts.URL)
+				objStore = store.NewHTTP(opts.URL, opts.Token)
 			}
 
 			// Load selected components from the project

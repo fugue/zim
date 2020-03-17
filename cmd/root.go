@@ -28,7 +28,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("url", "u", "", "Zim API URL")
 	rootCmd.PersistentFlags().StringP("dir", "d", ".", "Working directory")
 	rootCmd.PersistentFlags().String("region", "us-east-2", "AWS region")
-	rootCmd.PersistentFlags().Bool("docker", false, "Use Docker when running rules")
+	rootCmd.PersistentFlags().Bool("docker", true, "Use Docker when running rules")
 	rootCmd.PersistentFlags().Bool("debug", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringSliceP("kinds", "k", nil, "Select kinds of components to operate on")
 	rootCmd.PersistentFlags().StringSliceP("components", "c", nil, "Select components to operate on by name")

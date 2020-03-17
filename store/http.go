@@ -19,16 +19,16 @@ import (
 
 type httpStore struct {
 	signingURL string
+	authToken  string
 }
 
 // NewHTTP returns an HTTP storage interface
-func NewHTTP(signingURL string) Store {
-	return &httpStore{signingURL}
+func NewHTTP(signingURL, authToken string) Store {
+	return &httpStore{signingURL, authToken}
 }
 
 func (s *httpStore) request(ctx context.Context, url string, input *sign.Input, output interface{}) error {
-	zimToken := os.Getenv("ZIM_TOKEN")
-	if zimToken == "" {
+	if s.authToken == "" {
 		return fmt.Errorf("ZIM_TOKEN is not set")
 	}
 	js, err := json.Marshal(input)
@@ -37,7 +37,7 @@ func (s *httpStore) request(ctx context.Context, url string, input *sign.Input, 
 	}
 	cli := &http.Client{}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(js))
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", zimToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", s.authToken))
 	if err != nil {
 		return fmt.Errorf("Failed to build request: %s", err)
 	}

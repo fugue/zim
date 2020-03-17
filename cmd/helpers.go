@@ -55,6 +55,7 @@ type zimOptions struct {
 	Debug      bool
 	Jobs       int
 	CacheMode  string
+	Token      string
 }
 
 func getZimOptions() zimOptions {
@@ -70,6 +71,7 @@ func getZimOptions() zimOptions {
 		Debug:      viper.GetBool("debug"),
 		Jobs:       viper.GetInt("jobs"),
 		CacheMode:  viper.GetString("cache-mode"),
+		Token:      viper.GetString("token"),
 	}
 	if opts.Cache == "" {
 		opts.Cache = XDGCache()
