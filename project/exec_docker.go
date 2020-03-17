@@ -69,7 +69,7 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		"--rm",
 		"-t",
 		"--volume",
-		fmt.Sprintf("%s:/build", mountDir),
+		fmt.Sprintf("%s:/build:delegated", mountDir),
 		"--workdir",
 		path.Join("/build", workingRelDir),
 		"-e",
