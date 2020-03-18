@@ -17,6 +17,7 @@ import (
 // Project is a collection of Components that can be built and deployed
 type Project struct {
 	sync.Mutex
+	name            string
 	root            string
 	rootAbs         string
 	artifacts       string
@@ -84,6 +85,10 @@ func NewWithOptions(opts Opts) (*Project, error) {
 		executor:        executor,
 	}
 
+	if opts.ProjectDef != nil {
+		p.name = opts.ProjectDef.Name
+	}
+
 	for _, provider := range opts.Providers {
 		p.providers[provider.Name()] = provider
 		if opts.ProjectDef != nil {
@@ -122,7 +127,7 @@ func (p *Project) resolveDeps() error {
 
 // Name of the project
 func (p *Project) Name() string {
-	return path.Base(p.RootAbsPath())
+	return p.name
 }
 
 // Components returns all Components within the project
