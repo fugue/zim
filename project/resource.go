@@ -35,6 +35,9 @@ type Resource interface {
 	// AsFile returns the path to a file containing the Resource itself, or
 	// a representation of the Resource
 	AsFile() (string, error)
+
+	// Delete the resource
+	Delete() error
 }
 
 // HashFile returns the SHA1 hash of File contents

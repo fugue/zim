@@ -179,3 +179,9 @@ func (img *Image) LastModified() (time.Time, error) {
 func (img *Image) AsFile() (string, error) {
 	return "", errors.New("unsupported")
 }
+
+// Delete the image - not currently implemented
+func (img *Image) Delete() error {
+	// We could do this later if we want
+	return errors.New("unsupported")
+}

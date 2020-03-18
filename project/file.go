@@ -114,3 +114,8 @@ func (f *File) LastModified() (time.Time, error) {
 func (f *File) AsFile() (string, error) {
 	return f.path, nil
 }
+
+// Delete the file from disk
+func (f *File) Delete() error {
+	return os.Remove(f.Path())
+}

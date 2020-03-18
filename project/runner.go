@@ -51,6 +51,22 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		return Error, fmt.Errorf("Environment error %s: %s", r.NodeID(), err)
 	}
 
+	// By running this rule we want Zim to guantee that the rule's outputs
+	// are newly created. We need to remove any output files that already exist,
+	// run the rule, and then confirm all outputs were created.
+	for _, output := range r.Outputs() {
+		// We'll limit this behavior to file outputs for now. This could be
+		// extended to other resource types later if that is appropriate.
+		if output.OnFilesystem() {
+			if exists, _ := output.Exists(); exists {
+				if err := output.Delete(); err != nil {
+					return Error, fmt.Errorf("Failed to delete rule %s output %s: %s",
+						r.NodeID(), output.Name(), err)
+				}
+			}
+		}
+	}
+
 	// Execute the rule's commands one at a time. Each command will have its
 	// own bash shell if using the bash executor.
 	for i, cmd := range r.Commands() {
