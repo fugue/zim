@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: Zim Build System
 Globals:
   Function:
-    Timeout: 30
+    Timeout: 180
     MemorySize: 512
     Tracing: Active
     Runtime: go1.x
