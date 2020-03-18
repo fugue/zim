@@ -84,7 +84,13 @@ func TestNewProject(t *testing.T) {
 		},
 	}
 
-	p, err := NewWithOptions(Opts{Root: dir, ComponentDefs: defs})
+	projDef := &definitions.Project{Name: "example"}
+
+	p, err := NewWithOptions(Opts{
+		Root:          dir,
+		ComponentDefs: defs,
+		ProjectDef:    projDef,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,6 +106,9 @@ func TestNewProject(t *testing.T) {
 	}
 	if components[1].Name() != "b" {
 		t.Error("Expected 'b'")
+	}
+	if p.Name() != "example" {
+		t.Errorf("Incorrect project name: '%s'", p.Name())
 	}
 }
 
