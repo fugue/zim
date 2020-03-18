@@ -39,14 +39,21 @@ $(AUTH_DIST): $(AUTH_SOURCE)
 	zip $@ auth_lambda
 	rm auth_lambda
 
-.PHONY: deploy
-deploy: $(SIGNER_DIST) $(AUTH_DIST)
-	# --guided
+.PHONY: stack
+stack: $(SIGNER_DIST) $(AUTH_DIST)
 	sam deploy \
+		--guided \
 		--stack-name $(STACK_NAME) \
 		--no-fail-on-empty-changeset \
 		--region $(AWS_REGION)
-	@echo $(API_URL)
+
+.PHONY: deploy
+deploy: stack
+	@echo ""
+	@echo "Add this entry to the file ~/.zim.yaml:"
+	@echo ""
+	@echo "url: $(API_URL)"
+	@echo ""
 
 .PHONY: clean
 clean:

@@ -120,61 +120,62 @@ rule: myservice.build in 1.347 sec [OK]
 The outputs - an executable named `myservice` in this case - are stored in an
 `artifacts` directory located at the root level of the repository.
 
-## Creating the Cache
+## Creating the Shared Cache
 
-Currently Zim supports using AWS S3 for its cache backend. The S3 bucket and
-a handful of other serverless infrastructure is easily provisioned by using
+Currently Zim supports using AWS infrastructure for its cache backend.
+A CloudFormation stack containing an S3 bucket and a handful of other serverless
+infrastructure is easily provisioned by using
 [SAM](https://github.com/awslabs/aws-sam-cli).
 
 Prerequisites:
 
- * Install the AWS CLI: `pip install awscli`
- * Install the SAM CLI: `pip install aws-sam-cli`
- * Install Go to build Lambdas: `brew install go`
+ * Install the AWS and SAM CLIs: `pip install awscli aws-sam-cli`
+ * [Download Go](https://golang.org/dl/) to build the Zim Lambdas
+
+The following was tested with the following version of the SAM CLI:
+
+```
+$ sam --version
+SAM CLI, version 0.45.0
+```
 
 With those dependencies installed, run the following to provision cache
-infrastructure in AWS:
+infrastructure in AWS using a workflow guided by SAM:
 
 ```
-make deploy
+$ make deploy
 ```
 
-When the deploy completes, the URL of your Zim API is printed. This URL should
+When the command completes, the URL of your Zim API is printed. This URL should
 be saved to `~/.zim.yaml` as described in the following section.
 
-## Enabling the Cache in the CLI
+## Developer Setup
 
-Create the file `~/.zim.yaml` with the following contents:
+Each developer should create the file `~/.zim.yaml` on their development
+machine with two main variables:
 
-```
-url: "URL_FROM_MAKE_DEPLOY"
-```
+  * The team API URL from `make deploy`
+  * Your personal authentication token
 
-Alternatively, you can set the URL via the `ZIM_URL` environment variable.
-
-With caching enabled, running the example from the Getting Started section
-again should result in output like:
-
-```
-$ zim run build
-rule: myservice.build
-rule: myservice.build [CACHED]
-```
-
-## Cache Authentication
-
-Run the following command to create a new cache authentication token for each
-member of the team:
+With AWS credentials active for the account containing Zim, run the following
+command to create an authentication token for each team member:
 
 ```
 zim add token --email "joe@example.com" --name "Joe"
 ```
 
-Save the token as an environment variable `ZIM_TOKEN`.
+Each team member should now add the following to their `~/.zim.yaml`:
 
-## Cache Mode
+```
+url: "TEAM_API_URL"
+token: "MY_TOKEN"
+```
 
-You can optionally set the Zim CLI cache mode so that it only writes to the
+Alternatively, you can use the environment variables `ZIM_URL` and `ZIM_TOKEN`.
+
+## Cache Mode (Optional)
+
+You may override the Zim CLI cache mode so that it only writes to the
 cache and doesn't read. This may be useful for use in automated builds that
 should populate the cache but not read from it.
 
