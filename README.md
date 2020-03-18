@@ -1,5 +1,7 @@
 # Zim
 
+[![CircleCI](https://circleci.com/gh/fugue/zim.svg?style=svg)](https://circleci.com/gh/fugue/zim)
+
 Zim is a caching build system that is ideal for teams using monorepos containing
 many components and dependencies. Its primary goal is fast incremental builds
 across a team by leveraging a shared cache of rule outputs. It is entirely
