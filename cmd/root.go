@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -9,8 +10,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "zim",
-	Short: "The caching build tool",
+	Use:     "zim",
+	Short:   "The caching build tool",
+	Version: fmt.Sprintf("%s, build %s", Version, GitCommit),
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

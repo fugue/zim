@@ -5,6 +5,13 @@ BINARY = zim
 INSTALLED_BINARY = /usr/local/bin/$(BINARY)
 SOURCE = $(wildcard *.go) $(wildcard */*.go) $(wildcard cloud/*/*.go)
 GO = GO111MODULE=on go
+VERSION = $(shell cat VERSION)
+GITCOMMIT = $(shell git rev-parse --short HEAD 2> /dev/null || true)
+define LDFLAGS
+    -X \"github.com/fugue/zim/cmd.Version=$(VERSION)\" \
+    -X \"github.com/fugue/zim/cmd.GitCommit=$(GITCOMMIT)\"
+endef
+CLI_BUILD = $(GO) build -ldflags="$(LDFLAGS)"
 
 # Variables relating to the Zim CloudFormation stack
 STACK_NAME ?= zim
@@ -21,7 +28,15 @@ API_URL = $(shell aws cloudformation describe-stacks \
 	--output text)
 
 $(BINARY): $(SOURCE)
-	$(GO) build -v -o $(BINARY)
+	$(CLI_BUILD) -v -o $@
+
+$(BINARY)-linux-amd64: $(SOURCE)
+	GOOS=linux GOARCH=amd64 $(CLI_BUILD) -o $@
+
+$(BINARY)-darwin-amd64: $(SOURCE)
+	GOOS=darwin GOARCH=amd64 $(CLI_BUILD) -o $@
+
+release: $(BINARY)-linux-amd64 $(BINARY)-darwin-amd64
 
 .PHONY: install
 install: $(INSTALLED_BINARY)
@@ -59,7 +74,7 @@ deploy: stack
 clean:
 	rm -f cmp/cmp
 	rm -f coverage.out
-	rm -f $(BINARY)
+	rm -f $(BINARY) $(BINARY)-linux-amd64 $(BINARY)-darwin-amd64
 	rm -f $(SIGNER_DIST) $(AUTH_DIST)
 
 .PHONY: test
