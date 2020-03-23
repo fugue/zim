@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/LuminalHQ/zim/sign"
+	"github.com/fugue/zim/sign"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"

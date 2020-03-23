@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
-	"github.com/LuminalHQ/zim/queue"
+	"github.com/fugue/zim/queue"
 )
 
 // FargateRunner runs a rule on a remote container

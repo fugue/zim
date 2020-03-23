@@ -6,7 +6,7 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/LuminalHQ/zim/definitions"
+	"github.com/fugue/zim/definitions"
 	"github.com/hashicorp/go-multierror"
 )
 

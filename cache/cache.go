@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/LuminalHQ/zim/project"
-	"github.com/LuminalHQ/zim/store"
+	"github.com/fugue/zim/project"
+	"github.com/fugue/zim/store"
 )
 
 const WriteOnly = "WRITE_ONLY"

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/LuminalHQ/zim/definitions"
+	"github.com/fugue/zim/definitions"
 	"github.com/hashicorp/go-multierror"
 )
 

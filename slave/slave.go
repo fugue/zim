@@ -9,12 +9,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/LuminalHQ/zim/git"
+	"github.com/fugue/zim/git"
 
 	"github.com/aws/aws-sdk-go/service/sqs/sqsiface"
-	"github.com/LuminalHQ/zim/project"
-	"github.com/LuminalHQ/zim/queue"
-	"github.com/LuminalHQ/zim/store"
+	"github.com/fugue/zim/project"
+	"github.com/fugue/zim/queue"
+	"github.com/fugue/zim/store"
 )
 
 // Opts contains options used for running a Slave

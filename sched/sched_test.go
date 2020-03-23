@@ -7,8 +7,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/LuminalHQ/zim/definitions"
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/project"
 	"github.com/stretchr/testify/require"
 )
 

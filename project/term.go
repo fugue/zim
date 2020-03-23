@@ -5,7 +5,7 @@ import (
 	"time"
 
 	tm "github.com/buger/goterm"
-	"github.com/LuminalHQ/zim/queue"
+	"github.com/fugue/zim/queue"
 	"github.com/fatih/color"
 )
 

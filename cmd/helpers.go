@@ -6,8 +6,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/LuminalHQ/zim/git"
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/git"
+	"github.com/fugue/zim/project"
 	"github.com/spf13/viper"
 )
 

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LuminalHQ/zim/store"
+	"github.com/fugue/zim/store"
 )
 
 // BufferedOutput is middleware that shows rule stdout and stderr

@@ -6,7 +6,7 @@ import (
 
 	"github.com/awslabs/goformation"
 	"github.com/awslabs/goformation/intrinsics"
-	"github.com/LuminalHQ/zim/graph"
+	"github.com/fugue/zim/graph"
 )
 
 // DiscoverDependencies returns a Graph representing dependencies between

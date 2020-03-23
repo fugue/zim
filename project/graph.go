@@ -1,7 +1,7 @@
 package project
 
 import (
-	"github.com/LuminalHQ/zim/graph"
+	"github.com/fugue/zim/graph"
 )
 
 // GraphFromRules builds a dependency graph originating from the specified
