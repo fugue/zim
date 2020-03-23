@@ -10,8 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	cf "github.com/aws/aws-sdk-go/service/cloudformation"
-	"github.com/LuminalHQ/zim/cache"
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/cache"
+	"github.com/fugue/zim/project"
 )
 
 // CloudFormationError is a simple error type

@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/LuminalHQ/zim/definitions"
+	"github.com/fugue/zim/definitions"
 )
 
 func testDir(parent ...string) string {

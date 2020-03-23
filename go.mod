@@ -1,4 +1,4 @@
-module github.com/LuminalHQ/zim
+module github.com/fugue/zim
 
 go 1.12
 

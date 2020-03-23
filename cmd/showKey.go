@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/LuminalHQ/zim/cache"
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/cache"
+	"github.com/fugue/zim/project"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

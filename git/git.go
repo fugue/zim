@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/LuminalHQ/zim/store"
-	"github.com/LuminalHQ/zim/zip"
+	"github.com/fugue/zim/store"
+	"github.com/fugue/zim/zip"
 )
 
 // CreateArchive creates a Git archive at the given path

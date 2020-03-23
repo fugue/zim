@@ -3,7 +3,7 @@ package sched
 import (
 	"context"
 
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/project"
 )
 
 // Options used to configure the Scheduler

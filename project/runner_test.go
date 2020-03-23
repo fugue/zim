@@ -9,7 +9,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/LuminalHQ/zim/definitions"
+	"github.com/fugue/zim/definitions"
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )

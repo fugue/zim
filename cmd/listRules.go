@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/LuminalHQ/zim/format"
+	"github.com/fugue/zim/format"
 	"github.com/spf13/cobra"
 )
 

@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/LuminalHQ/zim/definitions"
+	"github.com/fugue/zim/definitions"
 )
 
 // Dependency on another Component (a Rule or an Export)

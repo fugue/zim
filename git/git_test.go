@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/LuminalHQ/zim/zip"
+	"github.com/fugue/zim/zip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

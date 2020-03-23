@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/LuminalHQ/zim/zip"
+	"github.com/fugue/zim/zip"
 )
 
 func tmpDir() string {

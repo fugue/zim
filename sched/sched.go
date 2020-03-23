@@ -6,8 +6,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/LuminalHQ/zim/graph"
-	"github.com/LuminalHQ/zim/project"
+	"github.com/fugue/zim/graph"
+	"github.com/fugue/zim/project"
 	"github.com/hashicorp/go-multierror"
 )
 

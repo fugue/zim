@@ -14,7 +14,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/LuminalHQ/zim/sign"
+	"github.com/fugue/zim/sign"
 )
 
 type httpStore struct {
