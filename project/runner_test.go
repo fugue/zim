@@ -57,7 +57,6 @@ func TestStandardRunner(t *testing.T) {
 		"DEP":       "",
 		"DEPS":      "",
 		"INPUT":     "main.go",
-		"INPUTS":    "main.go",
 		"KIND":      "flurble",
 		"NAME":      "a",
 		"NODE_ID":   "a.build",

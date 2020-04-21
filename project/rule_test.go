@@ -101,7 +101,6 @@ func TestRule(t *testing.T) {
 		"DEP":       "test_results.txt",
 		"DEPS":      "test_results.txt",
 		"INPUT":     "main.go",
-		"INPUTS":    "main.go",
 		"KIND":      "",
 		"NAME":      "foo",
 		"NODE_ID":   "foo.build",

@@ -320,7 +320,6 @@ in order to provide Rule commands some context:
  * `RULE` - the Rule name, e.g. "build"
  * `NODE_ID` - ID in Graph for the Rule, e.g. "myservice.build"
  * `INPUT` - the relative path to the first input
- * `INPUTS` - relative paths to all inputs (space separated)
  * `OUTPUT` - the relative path to the first output
  * `OUTPUTS` - relative paths to all outputs (space separated)
  * `DEP` - the relative path to the first dependency
