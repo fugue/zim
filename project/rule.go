@@ -215,7 +215,6 @@ func (r *Rule) Environment() (map[string]string, error) {
 
 	tEnv := map[string]string{
 		"INPUT":   firstIn,
-		"INPUTS":  strings.Join(inputs, " "),
 		"OUTPUT":  firstOut,
 		"OUTPUTS": strings.Join(outputs, " "),
 		"DEP":     firstDep,

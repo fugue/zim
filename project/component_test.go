@@ -190,7 +190,6 @@ func TestNewComponentRule(t *testing.T) {
 		"DEP":       "",
 		"DEPS":      "",
 		"INPUT":     "foo.go",
-		"INPUTS":    "foo.go main.go go.mod",
 		"OUTPUT":    "../../artifacts/foo",
 		"OUTPUTS":   "../../artifacts/foo",
 		"VOLUME":    "11",
