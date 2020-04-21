@@ -11,7 +11,7 @@ define LDFLAGS
     -X \"github.com/fugue/zim/cmd.Version=$(VERSION)\" \
     -X \"github.com/fugue/zim/cmd.GitCommit=$(GITCOMMIT)\"
 endef
-CLI_BUILD = $(GO) build -ldflags="$(LDFLAGS)"
+CLI_BUILD = $(GO) build -ldflags="$(LDFLAGS) -s -w"
 
 # Variables relating to the Zim CloudFormation stack
 STACK_NAME ?= zim
