@@ -22,6 +22,7 @@ type Rule struct {
 	Outputs     []string     `yaml:"outputs"`
 	Ignore      []string     `yaml:"ignore"`
 	Local       bool         `yaml:"local"`
+	Native      bool         `yaml:"native"`
 	Requires    []Dependency `yaml:"requires"`
 	Description string       `yaml:"description"`
 	Command     string       `yaml:"command"`

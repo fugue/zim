@@ -40,9 +40,13 @@ type StandardRunner struct{}
 // Run a rule with the provided executor and other options
 func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
 
+	var executor Executor
+
 	// Default to a simple bash executor if another one is not specified
-	if opts.Executor == nil {
-		opts.Executor = NewBashExecutor()
+	if opts.Executor == nil || r.IsNative() {
+		executor = NewBashExecutor()
+	} else {
+		executor = opts.Executor
 	}
 
 	// Determine the bash environment variables to be available to the execution
@@ -54,7 +58,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Execute the rule's commands one at a time. Each command will have its
 	// own bash shell if using the bash executor.
 	for i, cmd := range r.Commands() {
-		err := opts.Executor.Execute(ctx, ExecOpts{
+		err := executor.Execute(ctx, ExecOpts{
 			Name:             fmt.Sprintf("%s.%d", r.NodeID(), i),
 			Command:          cmd,
 			WorkingDirectory: r.Component().Directory(),

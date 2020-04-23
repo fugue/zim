@@ -42,6 +42,7 @@ type Key struct {
 	Component   string   `json:"component"`
 	Rule        string   `json:"rule"`
 	Image       string   `json:"image"`
+	Native      bool     `json:"native"`
 	OutputCount int      `json:"output_count"`
 	Inputs      []*Entry `json:"inputs"`
 	Deps        []*Entry `json:"deps"`
@@ -277,6 +278,7 @@ func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
 		Component:   r.Component().Name(),
 		Rule:        r.Name(),
 		Image:       r.Image(),
+		Native:      r.IsNative(),
 		Inputs:      make([]*Entry, 0, len(inputs)),
 		Deps:        make([]*Entry, 0, len(deps)),
 		Env:         make([]*Entry, 0, len(env)),

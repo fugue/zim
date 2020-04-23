@@ -21,7 +21,7 @@ type Rule struct {
 	component       *Component
 	name            string
 	local           bool
-	phony           bool
+	native          bool
 	inputs          []string
 	ignore          []string
 	requires        []*Dependency
@@ -42,6 +42,7 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 		name:        name,
 		description: self.Description,
 		local:       self.Local,
+		native:      self.Native,
 		inputs:      self.Inputs,
 		ignore:      self.Ignore,
 		outputs:     self.Outputs,
@@ -247,6 +248,12 @@ func (r *Rule) NodeID() string {
 // Image returns the Docker image used to build this Rule, if configured
 func (r *Rule) Image() string {
 	return r.Component().dockerImage
+}
+
+// IsNative returns true iff the Rule should run natively on the host rather
+// than in a Docker container
+func (r *Rule) IsNative() bool {
+	return r.native
 }
 
 // Dependencies of this rule. In order for this to Rule to run, its
