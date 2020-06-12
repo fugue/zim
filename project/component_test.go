@@ -161,8 +161,11 @@ func TestNewComponentRule(t *testing.T) {
 		t.Fatal("Expected one command")
 	}
 	cmd := rule.Commands()[0]
-	if cmd != "go build" {
-		t.Error("Incorrect command:", cmd)
+	if cmd.Kind != "run" {
+		t.Error("Incorrect command kind:", cmd.Kind)
+	}
+	if cmd.Argument != "go build" {
+		t.Error("Incorrect command argument:", cmd.Argument)
 	}
 
 	env := rule.BaseEnvironment()

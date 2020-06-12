@@ -57,18 +57,12 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Execute the rule's commands one at a time. Each command will have its
 	// own bash shell if using the bash executor.
 	for i, cmd := range r.Commands() {
-		err := opts.Executor.Execute(ctx, ExecOpts{
-			Name:             fmt.Sprintf("%s.%d", r.NodeID(), i),
-			Command:          cmd,
-			WorkingDirectory: r.Component().Directory(),
-			Env:              flattenEnvironment(env),
-			Stdout:           opts.Output,
-			Stderr:           opts.Output,
-			Image:            r.Image(),
-			Debug:            opts.Debug,
-			Cmdout:           opts.DebugOutput,
-		})
+		execOpts, err := buildExecution(r, opts, env, cmd)
 		if err != nil {
+			return Error, fmt.Errorf("Failed to build command %s: %s", r.NodeID(), err)
+		}
+		execOpts.Name = fmt.Sprintf("%s.%d", r.NodeID(), i)
+		if err := opts.Executor.Execute(ctx, execOpts); err != nil {
 			return ExecError, fmt.Errorf("Exec error %s: %s", r.NodeID(), err)
 		}
 	}
@@ -85,4 +79,29 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		return MissingOutputError, errs.ErrorOrNil()
 	}
 	return OK, nil
+}
+
+func buildExecution(r *Rule, runOpts RunOpts, env map[string]string, cmd *Command) (ExecOpts, error) {
+
+	var cmdText string
+	switch cmd.Kind {
+	case "run":
+		cmdText = cmd.Argument
+	case "zip":
+		cmdText = "TODO"
+	default:
+		return ExecOpts{}, fmt.Errorf("Unknown command kind: %s", cmd.Kind)
+	}
+
+	opts := ExecOpts{
+		Command:          cmdText,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Image:            r.Image(),
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	}
+	return opts, nil
 }

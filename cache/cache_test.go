@@ -108,6 +108,6 @@ func TestCacheKey(t *testing.T) {
 	// fmt.Println(string(js))
 
 	// Known / golden values
-	assert.Equal(t, "76210a1b69110fbab4368f0943451c43d132dbf2", key1Str)
-	assert.Equal(t, "dfc17112c86e320d733966fd38da435e4a0804c6", key2Str)
+	assert.Equal(t, "fc7d257d065150bcefae06ffa8a7d41eaa2756b2", key1Str)
+	assert.Equal(t, "de507b3451c7e65d19644f42dad5dc0c444684e0", key2Str)
 }
