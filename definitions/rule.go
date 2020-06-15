@@ -22,6 +22,7 @@ type Rule struct {
 	Outputs     []string     `yaml:"outputs"`
 	Ignore      []string     `yaml:"ignore"`
 	Local       bool         `yaml:"local"`
+	Native      bool         `yaml:"native"`
 	Requires    []Dependency `yaml:"requires"`
 	Description string       `yaml:"description"`
 	Command     string       `yaml:"command"`
@@ -35,6 +36,7 @@ func mergeRule(a, b Rule) Rule {
 		Outputs:     mergeStrings(a.Outputs, b.Outputs),
 		Ignore:      mergeStrings(a.Ignore, b.Ignore),
 		Local:       mergeBool(a.Local, b.Local),
+		Native:      mergeBool(a.Native, b.Native),
 		Requires:    mergeDependencies(a.Requires, b.Requires),
 		Description: mergeStr(a.Description, b.Description),
 		Command:     mergeStr(a.Command, b.Command),

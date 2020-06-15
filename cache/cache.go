@@ -49,6 +49,7 @@ type Key struct {
 	Toolchain   []*Entry `json:"toolchain"`
 	Version     string   `json:"version"`
 	Commands    []string `json:"commands"`
+	Native      bool     `json:"native"`
 	hex         string
 }
 
@@ -270,7 +271,7 @@ func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
 
 	root := r.Project().RootAbsPath()
 	deps := r.Dependencies()
-	version := "0.0.4"
+	version := "0.0.5"
 
 	key := &Key{
 		Project:     r.Project().Name(),
@@ -284,6 +285,7 @@ func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
 		OutputCount: len(r.Outputs()),
 		Commands:    make([]string, 0, len(r.Commands())),
 		Version:     version,
+		Native:      r.IsNative(),
 	}
 
 	// Include the hash of every input file in the key

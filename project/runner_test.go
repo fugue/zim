@@ -69,6 +69,7 @@ func TestStandardRunner(t *testing.T) {
 	writer = &buf
 
 	m := NewMockExecutor(ctrl)
+	m.EXPECT().UsesDocker().AnyTimes()
 	m.EXPECT().Execute(ctx, ExecOpts{
 		Name:             "a.build.0",
 		Command:          "ls ${NAME}",
