@@ -108,8 +108,13 @@ func Logger(runner Runner) Runner {
 		durationStr := fmt.Sprintf("in %.3f sec", duration.Seconds())
 
 		if err != nil {
-			fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()),
-				Bright(durationStr), Red("[FAILED]"))
+			if strings.Contains(err.Error(), "signal: killed") {
+				fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()),
+					Bright(durationStr), Red("[KILLED]"))
+			} else {
+				fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()),
+					Bright(durationStr), Red("[FAILED]"))
+			}
 		} else {
 			fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()),
 				Bright(durationStr), Green("[OK]"))

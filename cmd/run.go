@@ -4,18 +4,29 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"os/user"
 	"path/filepath"
+	"syscall"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/fugue/zim/cache"
 	"github.com/fugue/zim/project"
 	"github.com/fugue/zim/sched"
 	"github.com/fugue/zim/store"
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func closeHandler(cancel context.CancelFunc) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cancel()
+	}()
+}
 
 // NewRunCommand returns a scheduler command
 func NewRunCommand() *cobra.Command {
@@ -25,9 +36,9 @@ func NewRunCommand() *cobra.Command {
 		Short: "Run rules",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			timeout := 60 * time.Minute
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			closeHandler(cancel)
 
 			opts := getZimOptions()
 
@@ -109,21 +120,31 @@ func NewRunCommand() *cobra.Command {
 
 			// Run the scheduler which gives rules to workers to execute
 			// in order of rule dependencies
+			var schedulerErr error
 			scheduler := sched.NewGraphScheduler()
 			for _, rule := range opts.Rules {
 				rules := components.Rules([]string{rule})
 				if len(rules) == 0 {
 					return
 				}
-				err = scheduler.Run(ctx, sched.Options{
+				schedulerErr = scheduler.Run(ctx, sched.Options{
 					BuildID:    buildID,
 					Rules:      rules,
 					Runner:     runner,
 					Executor:   executor,
 					NumWorkers: opts.Jobs,
 				})
-				if err != nil {
-					fatal(err)
+				if schedulerErr != nil {
+					break
+				}
+			}
+
+			if schedulerErr != nil {
+				if schedulerErr.Error() == "context canceled" {
+					// Wait for cleanup before exiting
+					time.Sleep(time.Second)
+				} else {
+					fatal(schedulerErr)
 				}
 			}
 		},
