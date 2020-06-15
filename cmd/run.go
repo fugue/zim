@@ -142,7 +142,8 @@ func NewRunCommand() *cobra.Command {
 			if schedulerErr != nil {
 				if schedulerErr.Error() == "context canceled" {
 					// Wait for cleanup before exiting
-					time.Sleep(time.Second)
+					time.Sleep(time.Millisecond * 500)
+					os.Exit(1)
 				} else {
 					fatal(schedulerErr)
 				}
