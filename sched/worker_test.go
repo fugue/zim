@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sync"
 	"testing"
 
 	"github.com/fugue/zim/definitions"
@@ -60,7 +61,10 @@ func TestWorker(t *testing.T) {
 		return project.Cached, errors.New("bourgeoisie")
 	})
 
-	go worker(ctx, runner, "123", executor, ruleChan, resultChan)
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go worker(ctx, runner, "123", executor, ruleChan, resultChan, &wg)
 
 	// Send build rule to the worker
 	ruleChan <- build
@@ -71,4 +75,6 @@ func TestWorker(t *testing.T) {
 	assert.Equal(t, project.Cached, res.Code)
 	assert.Equal(t, "bourgeoisie", res.Error.Error())
 	assert.Equal(t, build, res.Rule)
+
+	wg.Wait()
 }

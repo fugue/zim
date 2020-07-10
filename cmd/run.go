@@ -25,6 +25,7 @@ func closeHandler(cancel context.CancelFunc) {
 	go func() {
 		<-c
 		cancel()
+		fmt.Println(project.Yellow(" Cleaning up before exiting..."))
 	}()
 }
 
