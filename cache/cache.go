@@ -132,7 +132,7 @@ func (c *Cache) Write(ctx context.Context, r *project.Rule) ([]string, error) {
 		return nil, fmt.Errorf("Rule has no outputs: %s", r.NodeID())
 	}
 
-	key, err := c.Key(r)
+	key, err := c.Key(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (c *Cache) Read(ctx context.Context, r *project.Rule) ([]string, error) {
 		return nil, fmt.Errorf("Rule has no outputs: %s", r.NodeID())
 	}
 
-	key, err := c.Key(r)
+	key, err := c.Key(ctx, r)
 	if err != nil {
 		return nil, err
 	}
@@ -245,15 +245,15 @@ func (c *Cache) get(ctx context.Context, key, dst string) error {
 
 // Key returns a struct of information that uniquely identifies the Rule's
 // inputs and configuration. This used to store Rule outputs in the cache.
-func (c *Cache) Key(r *project.Rule) (*Key, error) {
+func (c *Cache) Key(ctx context.Context, r *project.Rule) (*Key, error) {
 	// Previously had locking and an internal cache of keys that were
 	// already computed. Removed for now to focus on correctness first.
-	return c.buildKey(r)
+	return c.buildKey(ctx, r)
 }
 
 // Internal function that populates the Key data structure for a rule.
 // This call must remain safe for concurrent calls from multiple goroutines!
-func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
+func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 
 	inputs, err := r.Inputs()
 	if err != nil {
@@ -266,6 +266,14 @@ func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
 	toolchain, err := r.Component().Toolchain()
 	if err != nil {
 		return nil, err
+	}
+
+	// Bail early if the context was canceled. The toolchain step above
+	// sometimes takes a bit so this is a good spot to check the context.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
 	root := r.Project().RootAbsPath()
@@ -311,7 +319,7 @@ func (c *Cache) buildKey(r *project.Rule) (*Key, error) {
 
 	// Include the key of every dependency in this key
 	for _, dep := range deps {
-		depKey, err := c.buildKey(dep)
+		depKey, err := c.buildKey(ctx, dep)
 		if err != nil {
 			return nil, err
 		}
