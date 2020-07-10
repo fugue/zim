@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,6 +25,8 @@ func writeFile(name, text string) {
 }
 
 func TestCacheKey(t *testing.T) {
+
+	ctx := context.Background()
 
 	tmpDir, err := ioutil.TempDir("", "zim-testing-")
 	require.Nil(t, err)
@@ -89,10 +92,10 @@ func TestCacheKey(t *testing.T) {
 
 	cache := New(nil)
 
-	key1, err := cache.Key(testRule)
+	key1, err := cache.Key(ctx, testRule)
 	require.Nil(t, err, "Error getting cache key")
 
-	key2, err := cache.Key(buildRule)
+	key2, err := cache.Key(ctx, buildRule)
 	require.Nil(t, err, "Error getting cache key")
 
 	key1Str := key1.String()

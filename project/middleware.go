@@ -108,7 +108,10 @@ func Logger(runner Runner) Runner {
 		durationStr := fmt.Sprintf("in %.3f sec", duration.Seconds())
 
 		if err != nil {
-			if strings.Contains(err.Error(), "signal: killed") {
+			isKilled := strings.Contains(err.Error(), "signal: killed")
+			isCanceled := strings.Contains(err.Error(), "context canceled")
+
+			if isKilled || isCanceled {
 				fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()),
 					Bright(durationStr), Red("[KILLED]"))
 			} else {

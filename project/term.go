@@ -16,6 +16,9 @@ var (
 
 	// Red text color
 	Red func(args ...interface{}) string
+
+	// Yellow text color
+	Yellow func(args ...interface{}) string
 )
 
 func init() {
@@ -23,4 +26,5 @@ func init() {
 	Cyan = color.New(color.FgCyan).SprintFunc()
 	Green = color.New(color.FgGreen).SprintFunc()
 	Red = color.New(color.FgRed).SprintFunc()
+	Yellow = color.New(color.FgYellow).SprintFunc()
 }
