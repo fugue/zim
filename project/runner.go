@@ -40,8 +40,11 @@ type StandardRunner struct{}
 // Run a rule with the provided executor and other options
 func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
 
-	// Default to a simple bash executor if another one is not specified
 	if opts.Executor == nil {
+		// Default to a simple bash executor if another one is not specified
+		opts.Executor = NewBashExecutor()
+	} else if opts.Executor.UsesDocker() && r.native {
+		// The rule is set to "native" which means it is opting out of docker
 		opts.Executor = NewBashExecutor()
 	}
 

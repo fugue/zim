@@ -49,6 +49,7 @@ type Key struct {
 	Toolchain   []*Entry `json:"toolchain"`
 	Version     string   `json:"version"`
 	Commands    []string `json:"commands"`
+	Native      bool     `json:"native,omitempty"`
 	hex         string
 }
 
@@ -292,6 +293,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 		OutputCount: len(r.Outputs()),
 		Commands:    make([]string, 0, len(r.Commands())),
 		Version:     version,
+		Native:      r.IsNative(),
 	}
 
 	// Include the hash of every input file in the key
