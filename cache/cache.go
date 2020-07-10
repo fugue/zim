@@ -49,7 +49,7 @@ type Key struct {
 	Toolchain   []*Entry `json:"toolchain"`
 	Version     string   `json:"version"`
 	Commands    []string `json:"commands"`
-	Native      bool     `json:"native"`
+	Native      bool     `json:"native,omitempty"`
 	hex         string
 }
 
@@ -279,7 +279,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 
 	root := r.Project().RootAbsPath()
 	deps := r.Dependencies()
-	version := "0.0.5"
+	version := "0.0.4"
 
 	key := &Key{
 		Project:     r.Project().Name(),
