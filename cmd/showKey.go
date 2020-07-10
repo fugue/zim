@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -74,8 +75,9 @@ func NewShowKeyCommand() *cobra.Command {
 				fatal(fmt.Errorf("Unknown rule: %s.%s", componentName, ruleName))
 			}
 
+			ctx := context.Background()
 			zimCache := cache.New(nil)
-			key, err := zimCache.Key(r)
+			key, err := zimCache.Key(ctx, r)
 			if err != nil {
 				fatal(err)
 			}

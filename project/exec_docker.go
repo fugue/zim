@@ -69,7 +69,7 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		"--rm",
 		"-t",
 		"--volume",
-		fmt.Sprintf("%s:/build:delegated", mountDir),
+		fmt.Sprintf("%s:/build", mountDir),
 		"--workdir",
 		path.Join("/build", workingRelDir),
 		"-e",
@@ -111,6 +111,23 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	cmdColor := color.New(color.FgCyan).SprintFunc()
 	fmt.Fprintln(cmdOut, "cmd:", cmdColor(commandText))
 
+	// Notice if the context was canceled and call "docker rm" on the
+	// container since it continues to run otherwise. Better way possible?
+	done := make(chan bool)
+	defer close(done)
+	go func() {
+		select {
+		// Run finished normally
+		case <-done:
+			return
+		// Kill container since the context was canceled
+		case <-ctx.Done():
+			if opts.Name != "" {
+				killContainerWithName(opts.Name)
+			}
+		}
+	}()
+
 	return dockerCmd.Run()
 }
 
@@ -121,4 +138,8 @@ func (e *dockerExecutor) UsesDocker() bool {
 func extendSlice(s []string, item ...string) []string {
 	s = append(s, item...)
 	return s
+}
+
+func killContainerWithName(name string) error {
+	return exec.Command("docker", "rm", "-f", name).Run()
 }

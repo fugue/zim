@@ -2,6 +2,7 @@ package sched
 
 import (
 	"context"
+	"sync"
 
 	"github.com/fugue/zim/project"
 )
@@ -21,13 +22,28 @@ func worker(
 	buildID string,
 	exec project.Executor,
 	rules <-chan *project.Rule,
-	results chan<- *workerResult) {
+	results chan<- *workerResult,
+	wg *sync.WaitGroup) {
 
-	for rule := range rules {
-		code, err := runner.Run(ctx, rule, project.RunOpts{
-			BuildID:  buildID,
-			Executor: exec,
-		})
-		results <- &workerResult{Rule: rule, Code: code, Error: err}
+	defer wg.Done()
+
+	for {
+		select {
+
+		case rule, ok := <-rules:
+			if !ok {
+				return
+			}
+			code, err := runner.Run(ctx, rule, project.RunOpts{
+				BuildID:  buildID,
+				Executor: exec,
+			})
+			if ctx.Err() == nil {
+				results <- &workerResult{Rule: rule, Code: code, Error: err}
+			}
+
+		case <-ctx.Done():
+			return
+		}
 	}
 }

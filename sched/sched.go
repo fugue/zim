@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/fugue/zim/graph"
@@ -18,9 +19,6 @@ const (
 
 	// Unscheduled says that Rule has not had a chance to run yet
 	Unscheduled Status = iota
-
-	// Aborted indicates the Rule was not run due to failed dependencies
-	Aborted
 
 	// Running indicates the Rule is currently running
 	Running
@@ -55,12 +53,21 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 	}
 
 	// Run the specified number of workers to run rules in parallel
+	var wg sync.WaitGroup
 	var errors *multierror.Error
 	jobs := make(chan *project.Rule)
-	results := make(chan *workerResult)
+	results := make(chan *workerResult, opts.NumWorkers)
 	for w := 0; w < opts.NumWorkers; w++ {
-		go worker(ctx, opts.Runner, opts.BuildID, executor, jobs, results)
+		wg.Add(1)
+		go worker(ctx, opts.Runner, opts.BuildID, executor, jobs, results, &wg)
 	}
+
+	// Signal to the workers to exit when done running and then wait
+	// for them to exit before returning
+	defer func() {
+		close(jobs)
+		wg.Wait()
+	}()
 
 	// Tracks the state of each rule
 	ruleStates := map[*project.Rule]Status{}
@@ -114,6 +121,8 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 		select {
 		case result := <-results:
 			ruleDone(result.Rule, result.Error)
+		case <-ctx.Done():
+			return ctx.Err()
 		case <-time.After(20 * time.Millisecond):
 		}
 
@@ -150,9 +159,6 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 			}
 		}
 	}
-
-	// Signal to the workers to exit
-	close(jobs)
 
 	// Confirm all requested rules executed or produce an error
 	for _, rule := range opts.Rules {
