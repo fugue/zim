@@ -26,7 +26,7 @@ func NewListRulesCommand() *cobra.Command {
 		Aliases: []string{"r", "rule", "rules"},
 		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 			proj, err := getProject(opts.Directory)
 			if err != nil {
 				fatal(err)

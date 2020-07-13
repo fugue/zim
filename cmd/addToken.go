@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fugue/zim/project"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/fugue/zim/project"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -21,7 +21,7 @@ func NewAddTokenCommand() *cobra.Command {
 		Short: "Add a cache token",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 			name := viper.GetString("name")
 			email := viper.GetString("email")
 

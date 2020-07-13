@@ -22,7 +22,7 @@ func NewShowKeyCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			var ruleName, componentName string
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 
 			if gitDir, err := gitRoot(opts.Directory); err == nil {
 				opts.Directory = gitDir

@@ -47,6 +47,53 @@ func init() {
 	viper.BindPFlag("components", rootCmd.PersistentFlags().Lookup("components"))
 	viper.BindPFlag("rules", rootCmd.PersistentFlags().Lookup("rules"))
 	viper.BindPFlag("cache-mode", rootCmd.PersistentFlags().Lookup("cache-mode"))
+
+	// Flag completions
+	rootCmd.RegisterFlagCompletionFunc("components", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		opts := getZimOptions(cmd, args)
+		proj, err := getProject(opts.Directory)
+		if err != nil {
+			fatal(err)
+		}
+		comps, err := proj.Select([]string{}, []string{})
+		if err != nil {
+			fatal(err)
+		}
+
+		if len(opts.Rules) > 0 {
+			comps = comps.WithRule(opts.Rules...)
+		}
+
+		return comps.FilterNames(opts.Components), cobra.ShellCompDirectiveDefault
+	})
+
+	rootCmd.RegisterFlagCompletionFunc("kinds", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		opts := getZimOptions(cmd, args)
+		proj, err := getProject(opts.Directory)
+		if err != nil {
+			fatal(err)
+		}
+		comps, err := proj.Select([]string{}, []string{})
+		if err != nil {
+			fatal(err)
+		}
+
+		return comps.FilterKinds(opts.Kinds), cobra.ShellCompDirectiveDefault
+	})
+
+	rootCmd.RegisterFlagCompletionFunc("rules", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		opts := getZimOptions(cmd, args)
+		proj, err := getProject(opts.Directory)
+		if err != nil {
+			fatal(err)
+		}
+		comps, err := proj.Select(opts.Components, []string{})
+		if err != nil {
+			fatal(err)
+		}
+
+		return comps.FilterRules(opts.Rules), cobra.ShellCompDirectiveDefault
+	})
 }
 
 // initConfig reads in config file and ENV variables if set.

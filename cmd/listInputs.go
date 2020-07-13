@@ -28,7 +28,7 @@ func NewListInputsCommand() *cobra.Command {
 		Aliases: []string{"in", "ins", "inputs"},
 		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 			proj, err := getProject(opts.Directory)
 			if err != nil {
 				fatal(err)
