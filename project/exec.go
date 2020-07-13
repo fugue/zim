@@ -46,8 +46,6 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 
 	environment := append(os.Environ(), opts.Env...)
 
-	// TODO
-
 	// Replace newlines with semicolons if the command is multiline
 	commands := strings.Split(strings.TrimSpace(opts.Command), "\n")
 	commandText := strings.Join(commands, "; ")
