@@ -4,13 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
-	"path"
 	"strings"
 	"time"
-
-	"github.com/fugue/zim/store"
 )
 
 // BufferedOutput is middleware that shows rule stdout and stderr
@@ -29,57 +25,6 @@ func BufferedOutput(runner Runner) Runner {
 			}
 		}
 		return code, err
-	})
-}
-
-// NewCapturedOutput is middleware that directs stdout and stderr to the given buffer
-func NewCapturedOutput(w io.Writer) RunnerBuilder {
-	return RunnerBuilder(func(runner Runner) Runner {
-		return RunnerFunc(func(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
-			opts.Output = w
-			opts.DebugOutput = w
-			return runner.Run(ctx, r, opts)
-		})
-	})
-}
-
-// NewArtifactUploader is middleware that uploads built artifacts
-func NewArtifactUploader(s store.Store, dst string) RunnerBuilder {
-	return RunnerBuilder(func(runner Runner) Runner {
-		return RunnerFunc(func(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
-			code, err := runner.Run(ctx, r, opts)
-			if err != nil || code != OK {
-				return code, err
-			}
-			for _, out := range r.Outputs() {
-				dstKey := path.Join(dst, out.Name())
-				fmt.Fprintln(opts.Output, "upl:", dstKey)
-				if err := s.Put(ctx, dstKey, out.Path(), nil); err != nil {
-					return Error, err
-				}
-			}
-			return code, err
-		})
-	})
-}
-
-// NewArtifactDownloader is middleware that downloads built artifacts
-func NewArtifactDownloader(s store.Store) RunnerBuilder {
-	return RunnerBuilder(func(runner Runner) Runner {
-		return RunnerFunc(func(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
-			code, err := runner.Run(ctx, r, opts)
-			if err != nil || code != OK {
-				return code, err
-			}
-			for _, out := range r.Outputs() {
-				srcKey := path.Join("artifacts", opts.BuildID, out.Name())
-				fmt.Fprintln(opts.Output, "dnl:", srcKey, out.Name())
-				if err := s.Get(ctx, srcKey, out.Path()); err != nil {
-					return Error, err
-				}
-			}
-			return code, err
-		})
 	})
 }
 
