@@ -132,8 +132,8 @@ func (runner *StandardRunner) execRunCommand(
 }
 
 // Creates a zip file with the specified contents. By default, the options
-// `-qr` are used: quiet and recursive. The `cd` attribute may be used to
-// change into the specified directory before running the command.
+// `-qrFS` are used. The `cd` attribute may be used to change into the specified
+// directory before running the command.
 func (runner *StandardRunner) execZipCommand(
 	ctx context.Context,
 	r *Rule,
@@ -143,7 +143,7 @@ func (runner *StandardRunner) execZipCommand(
 	cmdIndex int,
 ) error {
 
-	opts := getCommandAttr(cmd, "options", "-qr")
+	opts := getCommandAttr(cmd, "options", "-qrFS")
 	input := getCommandAttr(cmd, "input", ".")
 	output := getCommandAttr(cmd, "output", "")
 	dir := getCommandAttr(cmd, "cd", "")
