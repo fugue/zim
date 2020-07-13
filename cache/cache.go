@@ -35,17 +35,21 @@ func (e Error) Error() string { return string(e) }
 // CacheMiss indicates the cache did not contain a match
 const CacheMiss = Error("Item not found in cache")
 
-// Entry within a Key which itself carries a key and optional value and attrs.
-// This is simply a container for information that contributes to the overall
-// cache key.
+// Entry carries the name and hash for one item within a Key
 type Entry struct {
-	Key        string                 `json:"key"`
-	Value      string                 `json:"value,omitempty"`
+	Name string `json:"name"`
+	Hash string `json:"hash"`
+}
+
+// command is the contribution to a cache key from a rule command
+type command struct {
+	Kind       string                 `json:"kind"`
+	Argument   string                 `json:"argument,omitempty"`
 	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
-func newEntry(key, value string) *Entry {
-	return &Entry{Key: key, Value: value}
+func newEntry(name, hash string) *Entry {
+	return &Entry{Name: name, Hash: hash}
 }
 
 // Key contains information used to build a key
@@ -292,7 +296,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 	root := r.Project().RootAbsPath()
 	deps := r.Dependencies()
 	cmds := r.Commands()
-	version := "0.0.5"
+	version := "0.0.4"
 
 	key := &Key{
 		Project:     r.Project().Name(),
@@ -384,11 +388,9 @@ func (c *Cache) hashString(s string) (string, error) {
 
 // HashCommand returns a SHA1 hash of the command configuration
 func HashCommand(cmd *project.Command) (string, error) {
-	// Shoehorn command data into a cache entry struct. This makes it explicit
-	// which command attributes are being referenced.
-	entry := &Entry{
-		Key:        cmd.Kind,
-		Value:      cmd.Argument,
+	entry := &command{
+		Kind:       cmd.Kind,
+		Argument:   cmd.Argument,
 		Attributes: cmd.Attributes,
 	}
 	h := sha1.New()
