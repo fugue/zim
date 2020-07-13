@@ -16,7 +16,16 @@ import (
 	"github.com/fugue/zim/store"
 )
 
-const WriteOnly = "WRITE_ONLY"
+const (
+	// ReadWrite is the default cache mode
+	ReadWrite = "read-write"
+
+	// WriteOnly mode is used to write to the cache but not read from it
+	WriteOnly = "write-only"
+
+	// Disabled mode bypasses all cache interactions
+	Disabled = "disabled"
+)
 
 // Error is used to handle cache misses and the like
 type Error string
