@@ -1,12 +1,23 @@
 package project
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"os"
+	"path"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/hashicorp/go-multierror"
 )
+
+var cmdColor *color.Color
+
+func init() {
+	cmdColor = color.New(color.FgMagenta)
+}
 
 // RunOpts contains options used to configure the running of Rules
 type RunOpts struct {
@@ -54,16 +65,28 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		return Error, fmt.Errorf("Environment error %s: %s", r.NodeID(), err)
 	}
 
-	// Execute the rule's commands one at a time. Each command will have its
-	// own bash shell if using the bash executor.
+	// Execute the rule's commands one at a time
 	for i, cmd := range r.Commands() {
-		execOpts, err := buildExecution(r, opts, env, cmd)
-		if err != nil {
-			return Error, fmt.Errorf("Failed to build command %s: %s", r.NodeID(), err)
+		var execError error
+		switch cmd.Kind {
+		case "run":
+			execError = runner.execRunCommand(ctx, r, opts, env, cmd, i)
+		case "zip":
+			execError = runner.execZipCommand(ctx, r, opts, env, cmd, i)
+		case "archive":
+			execError = runner.execArchiveCommand(ctx, r, opts, env, cmd, i)
+		case "mkdir":
+			execError = runner.execMkdirCommand(ctx, r, opts, env, cmd, i)
+		case "cleandir":
+			execError = runner.execCleandirCommand(ctx, r, opts, env, cmd, i)
+		case "remove":
+			execError = runner.execRemoveCommand(ctx, r, opts, env, cmd, i)
+		default:
+			return Error, fmt.Errorf("Unknown command kind in %s: %s",
+				r.NodeID(), cmd.Kind)
 		}
-		execOpts.Name = fmt.Sprintf("%s.%d", r.NodeID(), i)
-		if err := opts.Executor.Execute(ctx, execOpts); err != nil {
-			return ExecError, fmt.Errorf("Exec error %s: %s", r.NodeID(), err)
+		if execError != nil {
+			return ExecError, execError
 		}
 	}
 
@@ -81,20 +104,18 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	return OK, nil
 }
 
-func buildExecution(r *Rule, runOpts RunOpts, env map[string]string, cmd *Command) (ExecOpts, error) {
+// Runs commands in bash
+func (runner *StandardRunner) execRunCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
 
-	var cmdText string
-	switch cmd.Kind {
-	case "run":
-		cmdText = cmd.Argument
-	case "zip":
-		cmdText = "TODO"
-	default:
-		return ExecOpts{}, fmt.Errorf("Unknown command kind: %s", cmd.Kind)
-	}
-
-	opts := ExecOpts{
-		Command:          cmdText,
+	execOpts := ExecOpts{
+		Command:          cmd.Argument,
 		WorkingDirectory: r.Component().Directory(),
 		Env:              flattenEnvironment(env),
 		Stdout:           runOpts.Output,
@@ -102,6 +123,188 @@ func buildExecution(r *Rule, runOpts RunOpts, env map[string]string, cmd *Comman
 		Image:            r.Image(),
 		Debug:            runOpts.Debug,
 		Cmdout:           runOpts.DebugOutput,
+		Name:             fmt.Sprintf("%s.%d", r.NodeID(), cmdIndex),
 	}
-	return opts, nil
+	if err := runOpts.Executor.Execute(ctx, execOpts); err != nil {
+		return fmt.Errorf("Exec error %s: %s", r.NodeID(), err)
+	}
+	return nil
+}
+
+// Creates a zip file with the specified contents. By default, the options
+// `-qr` are used: quiet and recursive. The `cd` attribute may be used to
+// change into the specified directory before running the command.
+func (runner *StandardRunner) execZipCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+
+	opts := getCommandAttr(cmd, "options", "-qr")
+	input := getCommandAttr(cmd, "input", ".")
+	output := getCommandAttr(cmd, "output", "")
+	dir := getCommandAttr(cmd, "cd", "")
+
+	if output == "" {
+		return fmt.Errorf("Zip command has no output specified")
+	}
+	script := fmt.Sprintf("zip %s %s %s", opts, output, input)
+	if dir != "" {
+		script = fmt.Sprintf("cd %s && %s", dir, script)
+	}
+	buffer := &bytes.Buffer{}
+
+	if err := NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           buffer,
+	}); err != nil {
+		return err
+	}
+	fmt.Fprintln(runOpts.Output, "cmd:",
+		cmdColor.Sprintf("[zip] created %s", output))
+	return nil
+}
+
+// Runs the `tar` command to create an archive using gzip if the default options
+// are used. Equivalent to `tar -czf $OUTPUT $INPUT`.
+func (runner *StandardRunner) execArchiveCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+
+	opts := getCommandAttr(cmd, "options", "-czf")
+	input := getCommandAttr(cmd, "input", "")
+	output := getCommandAttr(cmd, "output", "")
+
+	if input == "" {
+		return fmt.Errorf("Archive command has no input specified")
+	}
+	if output == "" {
+		return fmt.Errorf("Archive command has no output specified")
+	}
+	script := fmt.Sprintf("tar %s %s %s", opts, output, input)
+	buffer := &bytes.Buffer{}
+
+	if err := NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           buffer,
+	}); err != nil {
+		return err
+	}
+	fmt.Fprintln(runOpts.Output, "cmd:",
+		cmdColor.Sprintf("[archive] created %s", output))
+	return nil
+}
+
+// Creates a directory and its parents as needed. Equivalent to `mkdir -p`.
+func (runner *StandardRunner) execMkdirCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+	if arg == "" {
+		return fmt.Errorf("mkdir command has no directory specified")
+	}
+	var dir string
+	if !path.IsAbs(dir) {
+		dir = path.Join(r.Component().Directory(), dir)
+	} else {
+		dir = arg
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[mkdir] %s", arg))
+	return nil
+}
+
+// Ensures an empty directory with the given name exists. If the directory
+// existed previously it is first removed. Useful for build temp directories.
+// Equivalent to `rm -rf $DIR && mkdir -p $DIR`.
+func (runner *StandardRunner) execCleandirCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+	if arg == "" {
+		return fmt.Errorf("cleandir command has no directory specified")
+	}
+	if arg == "/" {
+		return fmt.Errorf("cleandir cannot run against /")
+	}
+	var dir string
+	if !path.IsAbs(dir) {
+		dir = path.Join(r.Component().Directory(), arg)
+	} else {
+		dir = arg
+	}
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[cleandir] %s", arg))
+	return nil
+}
+
+// Remove one or more files or directories. Equivalent to `rm -rf`.
+func (runner *StandardRunner) execRemoveCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+	if arg == "" {
+		return fmt.Errorf("rm command has no targets specified")
+	}
+	for _, target := range strings.Split(arg, " ") {
+		if target == "/" {
+			return fmt.Errorf("rm cannot run against /")
+		}
+		if !path.IsAbs(target) {
+			target = path.Join(r.Component().Directory(), target)
+		}
+		if err := os.RemoveAll(target); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[remove] %s", arg))
+	return nil
+}
+
+func getCommandAttr(cmd *Command, attr, defaultValue string) string {
+	value, ok := cmd.Attributes[attr].(string)
+	if !ok {
+		return defaultValue
+	}
+	return value
 }
