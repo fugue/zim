@@ -99,7 +99,7 @@ For each item in the repository that you would like to build with Zim, add
 a `component.yaml` file in the corresponding directory. A simple example to
 build a Go program is as follows.
 
-```
+```yaml
 name: myservice
 rules:
   build:
@@ -112,7 +112,7 @@ rules:
 
 With that definition saved, you can now enter `zim run build` to get it done.
 
-```
+```shell
 $ zim run build --cache disabled
 rule: myservice.build
 cmd: go build -o ${OUTPUT}
@@ -181,7 +181,7 @@ You may override the Zim CLI cache mode. The following modes are available:
 
  * `read-write` - this is the default
  * `write-only` - write to the cache but don't read from it
- * `disabled` - makes Zim operate in offline mode
+ * `disabled` - operate in offline mode
 
 To use this feature, set `cache` in `~/.zim.yaml` as follows:
 
