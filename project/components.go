@@ -36,6 +36,20 @@ func (comps Components) WithName(name ...string) Components {
 	return result
 }
 
+// WithRule filters the Components to those with matching rule names
+func (comps Components) WithRule(rule ...string) Components {
+	var result Components
+	for _, c := range comps {
+		for _, r := range rule {
+			if _, found := c.rules[r]; found {
+				result = append(result, c)
+				break
+			}
+		}
+	}
+	return result
+}
+
 // First component in the list, or nil if the list is empty
 func (comps Components) First() *Component {
 	if len(comps) > 0 {
@@ -74,4 +88,70 @@ func (rules Rules) First() *Rule {
 		return rules[0]
 	}
 	return nil
+}
+
+// FilterNames returns a slice of component names minus the given names
+func (comps Components) FilterNames(names []string) []string {
+	namesMap := make(map[string]bool, len(names))
+	for _, name := range names {
+		namesMap[name] = true
+	}
+
+	var filteredNames []string
+	for _, comp := range comps {
+		name := comp.Name()
+		if !namesMap[name] {
+			filteredNames = append(filteredNames, name)
+		}
+	}
+
+	return filteredNames
+}
+
+// FilterKinds returns a slice of component kinds minus the given kinds
+func (comps Components) FilterKinds(kinds []string) []string {
+	kindsMap := make(map[string]bool, len(kinds))
+	for _, kind := range kinds {
+		kindsMap[kind] = true
+	}
+
+	seenKinds := make(map[string]bool, len(comps))
+	var filteredKinds []string
+	for _, comp := range comps {
+		kind := comp.Kind()
+		if !seenKinds[kind] {
+			seenKinds[kind] = true
+
+			if !kindsMap[kind] {
+				filteredKinds = append(filteredKinds, kind)
+			}
+		}
+	}
+
+	return filteredKinds
+}
+
+// FilterRules returns a slice of component rules minus the given rules
+func (comps Components) FilterRules(rules []string) []string {
+	rulesMap := make(map[string]bool, len(rules))
+	for _, rule := range rules {
+		rulesMap[rule] = true
+	}
+
+	seenRules := make(map[string]bool, len(comps))
+	var filteredRules []string
+	for _, comp := range comps {
+		for _, rule := range comp.Rules() {
+			ruleName := rule.Name()
+			if !seenRules[ruleName] {
+				seenRules[ruleName] = true
+
+				if !rulesMap[ruleName] {
+					filteredRules = append(filteredRules, ruleName)
+				}
+			}
+		}
+	}
+
+	return filteredRules
 }

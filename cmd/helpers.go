@@ -8,6 +8,7 @@ import (
 
 	"github.com/fugue/zim/git"
 	"github.com/fugue/zim/project"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -59,7 +60,7 @@ type zimOptions struct {
 	Token      string
 }
 
-func getZimOptions() zimOptions {
+func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 	opts := zimOptions{
 		Directory:  viper.GetString("dir"),
 		URL:        viper.GetString("url"),
@@ -82,6 +83,12 @@ func getZimOptions() zimOptions {
 	for i, c := range opts.Components {
 		opts.Components[i] = filepath.Base(c)
 	}
+
+	// Rules can be specified by arguments or options for run
+	if cmd.Name() == "run" && len(opts.Rules) == 0 && len(args) > 0 {
+		opts.Rules = args
+	}
+
 	return opts
 }
 

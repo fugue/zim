@@ -470,3 +470,12 @@ Create a new authentication token during setup:
 ```shell
 $ zim add token
 ```
+
+## Shell Completions
+
+Auto-completion is available for Components, Rules, and Kinds. Run the following
+for instructions:
+
+```shell
+$ zim completion -h
+```

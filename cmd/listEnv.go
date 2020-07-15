@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fugue/zim/format"
 	"github.com/fatih/structs"
+	"github.com/fugue/zim/format"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ var listEnvCmd = &cobra.Command{
 			"Value",
 		}
 
-		fields := structs.Map(getZimOptions())
+		fields := structs.Map(getZimOptions(cmd, args))
 
 		var rows []interface{}
 		for _, k := range []string{"URL", "Region", "Debug", "Jobs", "UseDocker"} {

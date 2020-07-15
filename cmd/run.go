@@ -40,7 +40,7 @@ func NewRunCommand() *cobra.Command {
 			defer cancel()
 			closeHandler(cancel)
 
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 
 			// If inside a git repo pick the root as the project directory
 			if repo, err := getRepository(opts.Directory); err == nil {
@@ -54,11 +54,6 @@ func NewRunCommand() *cobra.Command {
 
 			if opts.Jobs < 1 {
 				opts.Jobs = 1
-			}
-
-			// Rules can be specified by arguments or options
-			if len(opts.Rules) == 0 && len(args) > 0 {
-				opts.Rules = args
 			}
 
 			var executor project.Executor
@@ -150,6 +145,18 @@ func NewRunCommand() *cobra.Command {
 					fatal(schedulerErr)
 				}
 			}
+		},
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			opts := getZimOptions(cmd, args)
+			proj, err := getProject(opts.Directory)
+			if err != nil {
+				fatal(err)
+			}
+			comps, err := proj.Select(opts.Components, []string{})
+			if err != nil {
+				fatal(err)
+			}
+			return comps.FilterRules(opts.Rules), cobra.ShellCompDirectiveNoFileComp
 		},
 	}
 

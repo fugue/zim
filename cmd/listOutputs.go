@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fugue/zim/format"
 	"github.com/fatih/color"
+	"github.com/fugue/zim/format"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,7 @@ func NewListArtifactsCommand() *cobra.Command {
 		Aliases: []string{"out", "outs", "outputs"},
 		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := getZimOptions()
+			opts := getZimOptions(cmd, args)
 			proj, err := getProject(opts.Directory)
 			if err != nil {
 				fatal(err)
