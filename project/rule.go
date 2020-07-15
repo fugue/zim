@@ -16,6 +16,39 @@ type Dependency struct {
 	Recurse   int
 }
 
+// Command to be run by a Rule
+type Command struct {
+	Kind       string
+	Argument   string
+	Attributes map[string]interface{}
+}
+
+// NewCommands constructs Commands extracted from a rule YAML definition
+func NewCommands(self *definitions.Rule) (result []*Command, err error) {
+	defCommands, err := self.GetCommands()
+	if err != nil {
+		return nil, err
+	}
+	// This form is used when the rule has a simple string for a command
+	if len(defCommands) == 0 {
+		result = []*Command{&Command{
+			Kind:     "run",
+			Argument: self.Command,
+		}}
+		return
+	}
+	// Otherwise, the rule has a series of commands
+	result = make([]*Command, 0, len(defCommands))
+	for _, c := range defCommands {
+		result = append(result, &Command{
+			Kind:       c.Kind,
+			Argument:   c.Argument,
+			Attributes: c.Attributes,
+		})
+	}
+	return
+}
+
 // Rule is an operation on a Component
 type Rule struct {
 	component       *Component
@@ -27,7 +60,7 @@ type Rule struct {
 	requires        []*Dependency
 	outputs         []string
 	description     string
-	commands        []string
+	commands        []*Command
 	resolvedDeps    []*Rule
 	resolvedImports []*Export
 	inProvider      Provider
@@ -36,6 +69,11 @@ type Rule struct {
 
 // NewRule constructs a Rule from a provided YAML definition
 func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
+
+	commands, err := NewCommands(self)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create rule commands: %v", err)
+	}
 
 	r := &Rule{
 		component:   c,
@@ -46,7 +84,7 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 		inputs:      self.Inputs,
 		ignore:      self.Ignore,
 		outputs:     self.Outputs,
-		commands:    self.Commands,
+		commands:    commands,
 		requires:    make([]*Dependency, 0, len(self.Requires)),
 	}
 
@@ -59,11 +97,6 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 		})
 	}
 
-	if len(r.commands) == 0 && len(self.Command) > 0 {
-		r.commands = []string{self.Command}
-	}
-
-	var err error
 	r.inProvider, err = c.Provider(self.Providers.Inputs)
 	if err != nil {
 		return nil, fmt.Errorf("Rule %s provider error: %s", r.NodeID(), err)
@@ -311,7 +344,7 @@ func (r *Rule) DependencyOutputs() (outputs Resources) {
 }
 
 // Commands that define Rule execution
-func (r *Rule) Commands() []string {
+func (r *Rule) Commands() []*Command {
 	return r.commands
 }
 
