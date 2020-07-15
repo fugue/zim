@@ -113,7 +113,7 @@ rules:
 With that definition saved, you can now enter `zim run build` to get it done.
 
 ```
-$ zim run build
+$ zim run build --cache disabled
 rule: myservice.build
 cmd: go build -o ${OUTPUT}
 rule: myservice.build in 1.347 sec [OK]
@@ -136,7 +136,7 @@ Prerequisites:
 
 The following was tested with the following version of the SAM CLI:
 
-```
+```shell
 $ sam --version
 SAM CLI, version 0.45.0
 ```
@@ -144,7 +144,7 @@ SAM CLI, version 0.45.0
 With those dependencies installed, run the following to provision cache
 infrastructure in AWS using a workflow guided by SAM:
 
-```
+```shell
 $ make deploy
 ```
 
@@ -162,29 +162,37 @@ machine with two main variables:
 With AWS credentials active for the account containing Zim, run the following
 command to create an authentication token for each team member:
 
-```
-zim add token --email "joe@example.com" --name "Joe"
+```shell
+$ zim add token --email "joe@example.com" --name "Joe"
 ```
 
 Each team member should now add the following to their `~/.zim.yaml`:
 
-```
+```yaml
 url: "TEAM_API_URL"
 token: "MY_TOKEN"
 ```
 
 Alternatively, you can use the environment variables `ZIM_URL` and `ZIM_TOKEN`.
 
-## Cache Mode (Optional)
+## Cache Mode
 
-You may override the Zim CLI cache mode so that it only writes to the
-cache and doesn't read. This may be useful for use in automated builds that
-should populate the cache but not read from it.
+You may override the Zim CLI cache mode. The following modes are available:
 
-To use this feature, set `cache-mode` in `~/.zim.yaml` as follows:
+ * `read-write` - this is the default
+ * `write-only` - write to the cache but don't read from it
+ * `disabled` - makes Zim operate in offline mode
 
+To use this feature, set `cache` in `~/.zim.yaml` as follows:
+
+```yaml
+cache: disabled
 ```
-cache-mode: WRITE_ONLY
+
+Or use the command line flag:
+
+```shell
+$ zim run build --cache disabled
 ```
 
 ## Running Rules in Docker
@@ -194,7 +202,7 @@ directly, define a Docker image for each component and set the Docker option.
 
 For example, to build a Go service in a container, you could use the following:
 
-```
+```yaml
 name: myservice
 docker:
   image: circleci/golang:1.12.4
@@ -211,15 +219,22 @@ rules:
     command: go build -o ${OUTPUT}
 ```
 
-Be sure to provide the `--docker` flag or set it via one of the other
-Viper mechanisms as discussed above.
-
-With Docker enabled, Zim mounts the repository as a volume and sets the
-component directory as the working directory when executing its rules.
+When a Docker image is specified for the component, Zim mounts the repository as
+a volume and sets the component directory as the working directory when
+executing its rules.
 
 Note the use of `toolchain` in the `component.yaml`. The above example includes
 the output of `go version` in the *Rule Key* so that builds on different
 architecture receive unique keys in the cache.
+
+To opt-out of using Docker for certain rules, set the `native` flag as follows:
+
+```yaml
+rules:
+  show-host-arch:
+    native: true
+    command: uname -a
+```
 
 ## Rule Keys
 
@@ -231,12 +246,14 @@ following information for each rule:
 * Component name
 * Rule name
 * Docker image
+* Output artifact count
 * Input file relative paths and their SHA1 hashes
 * Rule dependencies and their keys
 * Environment variables set on the Component and Rule
 * Toolchain
+* Cache key version
 * Rule commands
-* Zim version
+* Whether the rule is native
 
 This information uniquely identifies all the inputs and configuration used
 by a rule. This means, prior to executing a rule, Zim can determine the current
@@ -251,18 +268,15 @@ be exactly the same, even with the same file inputs.
 If you would like to see a key for a given rule for debugging purposes, you
 can use the following command:
 
-```
-zim key -r myservice.build
+```shell
+$ zim key -r myservice.build
 ```
 
 To retrieve the underlying information:
 
+```shell
+$ zim key -r myservice.build --detail
 ```
-zim key -r myservice.build --detail
-```
-
-To learn more about Rule Keys, I recommend the
-[Buck Docs](https://buck.build/concept/rule_keys.html) for now.
 
 ## Rule Dependencies
 
@@ -272,7 +286,7 @@ Zim traverses when running rules.
 
 To define a dependency, use the following syntax in a Component definition:
 
-```
+```yaml
 name: myservice
 kind: go
 rules:
@@ -297,22 +311,53 @@ when those complete successfully will it build `myservice`.
 When declaring a requirement, if the Component is omitted, then it is assumed
 to be referring to another named Rule in the current Component.
 
-## Variables
+## Source Dependencies
+
+In the case of one component depending on another's source code, the exported
+source files can be advertised. The following example declares `source` as a
+named export from `my_go_lib`:
+
+```yaml
+name: my_go_lib
+exports:
+  source:
+    resources:
+    - go.mod
+    - go.sum
+    - "**/*.go"
+    ignore:
+    - "**/*_test.go"
+```
+
+That exported source can then be declared as a dependency of a binary:
+
+```yaml
+name: my_exe
+rules:
+  build:
+    requires:
+      - component: my_go_lib
+        export: source
+```
+
+Requiring an export in this way incorporates all files from the export into
+the component's rule key.
+
+## Build Variables
 
 Rules are able to leverage environment variables from two sources. First,
-developers may define an environment for each Component using the following
-syntax, which results in these variables being available when all rules of
-this Component are executed:
+environment variables may be defined at the Component level, which makes them
+available to all rules of the Component:
 
-```
+```yaml
 name: myservice
 environment:
   RETRY_COUNT: 3
-  FOO: "bar"
+  FOO: bar
 ```
 
-Second, a handful of environment variables are automatically inserted by Zim
-in order to provide Rule commands some context:
+Second, a handful of environment variables are automatically injected to provide
+Rule commands some context:
 
  * `COMPONENT` - the Component name, e.g. "myservice"
  * `NAME` - the Component name, e.g. "myservice"
@@ -325,26 +370,103 @@ in order to provide Rule commands some context:
  * `DEP` - the relative path to the first dependency
  * `DEPS` - relative paths to all dependencies (space separated)
 
-The input, output, and dependency variables all follow the same order as
-present in the Component YAML definition.
-
 As a trivial example, if a Rule lists "*.go" as an input and the Component has
 one Go file in the directory named "main.go", then `INPUT=main.go` is set in
 the Rule environment.
 
-These automatic variables are similar in purpose to those found in GNU Make.
-For example, `INPUT` is equivalent to `$<` and `OUTPUT` is equivalent to `$@`.
+## Built-in Rule Commands
 
-Support for more dynamic variables will be added as needed for new use cases.
+Zim offers some built-in commands that may be leveraged within rules. To use
+these, specify `commands` as a list in a rule definition instead of a simple
+`command` string. Here is an example showing how to create a zip file containing
+the contents of the `dist` directory in a build:
 
-## Commands
+```yaml
+rules:
+  build:
+    inputs:
+      - src/**
+      - package.json
+    outputs:
+      - ${NAME}.zip
+    commands:
+      - cleandir: dist
+      - run: yarn run build
+      - zip:
+          cd: dist
+          input: "."
+          output: ../${OUTPUT}
+```
+
+Available built-ins:
+
+ * `run` - runs the following commands in a shell
+ * `mkdir` - creates a directory and its parents as needed (mkdir -p)
+ * `cleandir` - removes and recreates the directory (rm -rf then mkdir -p)
+ * `remove` - removes files or directories (rm -rf)
+ * `zip` - create a zip archive. Parameters as follows:
+   * `options` - zip command options (default `-qrFS`)
+   * `input` - path to input files (default `.`)
+   * `output` - required zip output path
+   * `cd` - optional directory to cd into before running the command
+ * `archive` - create a tgz archive. Parameters as follows:
+   * `options` - tar command options (default `-czf`)
+   * `input` - required path(s) to input files
+   * `output` - required path to output tgz
+
+These built-ins execute on the build host, not in the container, when a
+Component is Docker-enabled. This is helpful to avoid I/O performance penalties
+with Docker on MacOS for example.
+
+## Commands in the CLI
 
 Here are the most commonly used commands.
 
- * `zim run` - runs rules specified via args or flags
- * `zim key -r myservice.build` - shows the current key for a rule
- * `zim list rules` - shows Rules in the Project
- * `zim list components` - shows Components in the Project
- * `zim list inputs -c myservice` - shows inputs used by a Component
- * `zim list env` - shows Zim Viper configuration
- * `zim add token` - create a new authentication token
+Run all `build` rules in the Project with the following. Note that `build` is an
+arbitrary rule name with no special behavior.
+
+```shell
+$ zim run build
+```
+
+Run the `clean` rule for two specific Components:
+
+```shell
+$ zim run clean -c comp1,comp2
+```
+
+Build a Component with the cache disabled:
+
+```shell
+$ zim run build --cache disabled -c comp1
+```
+
+Show the rule cache key for a specific Component and Rule:
+
+```shell
+$ zim key -r myservice.build
+```
+
+Show the detailed contents of a rule cache key:
+
+```shell
+$ zim key -r myservice.build --detail
+```
+
+Show all Components in the Project:
+
+```shell
+$ zim list components
+```
+
+Show all input files used by a Component:
+
+```shell
+$ zim list inputs -c myservice
+```
+
+Create a new authentication token during setup:
+
+```shell
+$ zim add token
+```
