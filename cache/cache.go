@@ -16,7 +16,16 @@ import (
 	"github.com/fugue/zim/store"
 )
 
-const WriteOnly = "WRITE_ONLY"
+const (
+	// ReadWrite is the default cache mode
+	ReadWrite = "read-write"
+
+	// WriteOnly mode is used to write to the cache but not read from it
+	WriteOnly = "write-only"
+
+	// Disabled mode bypasses all cache interactions
+	Disabled = "disabled"
+)
 
 // Error is used to handle cache misses and the like
 type Error string
@@ -30,6 +39,13 @@ const CacheMiss = Error("Item not found in cache")
 type Entry struct {
 	Name string `json:"name"`
 	Hash string `json:"hash"`
+}
+
+// command is the contribution to a cache key from a rule command
+type command struct {
+	Kind       string                 `json:"kind"`
+	Argument   string                 `json:"argument,omitempty"`
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
 func newEntry(name, hash string) *Entry {
@@ -279,6 +295,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 
 	root := r.Project().RootAbsPath()
 	deps := r.Dependencies()
+	cmds := r.Commands()
 	version := "0.0.4"
 
 	key := &Key{
@@ -290,8 +307,8 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 		Deps:        make([]*Entry, 0, len(deps)),
 		Env:         make([]*Entry, 0, len(env)),
 		Toolchain:   make([]*Entry, 0, len(toolchain)),
-		OutputCount: len(r.Outputs()),
 		Commands:    make([]string, 0, len(r.Commands())),
+		OutputCount: len(r.Outputs()),
 		Version:     version,
 		Native:      r.IsNative(),
 	}
@@ -334,9 +351,20 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 		key.Toolchain = append(key.Toolchain, newEntry(k, toolchain[k]))
 	}
 
-	// Include the commands used to build the rule in the key
-	for _, cmd := range r.Commands() {
-		key.Commands = append(key.Commands, cmd)
+	// Include rule commands in the key
+	for _, cmd := range cmds {
+		// For standard "run" commands, use the command text directly.
+		// This maintains cache key compatibility with older versions of Zim.
+		if cmd.Kind == "run" {
+			key.Commands = append(key.Commands, cmd.Argument)
+		} else {
+			// For new built-in commands, reduce the command to a hash.
+			hashStr, err := HashCommand(cmd)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to hash command: %s", err)
+			}
+			key.Commands = append(key.Commands, hashStr)
+		}
 	}
 
 	// Determine the hex string for this key
@@ -356,6 +384,20 @@ func (c *Cache) hashFile(p string) (string, error) {
 func (c *Cache) hashString(s string) (string, error) {
 	// No caching for now
 	return HashString(s)
+}
+
+// HashCommand returns a SHA1 hash of the command configuration
+func HashCommand(cmd *project.Command) (string, error) {
+	entry := &command{
+		Kind:       cmd.Kind,
+		Argument:   cmd.Argument,
+		Attributes: cmd.Attributes,
+	}
+	h := sha1.New()
+	if err := json.NewEncoder(h).Encode(entry); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
 // HashFile returns the SHA1 hash of file contents

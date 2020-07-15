@@ -31,9 +31,7 @@ func TestStandardRunner(t *testing.T) {
 					Description: "build",
 					Inputs:      []string{"main.go"},
 					Outputs:     []string{"myartifact"},
-					Commands: []string{
-						"ls ${NAME}",
-					},
+					Command:     "ls ${NAME}",
 				},
 			},
 		},

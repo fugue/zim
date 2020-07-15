@@ -35,7 +35,8 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceP("kinds", "k", nil, "Select kinds of components to operate on")
 	rootCmd.PersistentFlags().StringSliceP("components", "c", nil, "Select components to operate on by name")
 	rootCmd.PersistentFlags().StringSliceP("rules", "r", nil, "Rules to run against components")
-	rootCmd.PersistentFlags().String("cache-mode", "", "Cache mode (WRITE_ONLY)")
+	rootCmd.PersistentFlags().String("cache", "read-write", "Cache mode (read-write | write-only | disabled)")
+	rootCmd.PersistentFlags().String("output", "buffered", "Output mode (buffered | unbuffered)")
 
 	// Bind flags to environment variables if they are present
 	viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
@@ -46,7 +47,8 @@ func init() {
 	viper.BindPFlag("kinds", rootCmd.PersistentFlags().Lookup("kinds"))
 	viper.BindPFlag("components", rootCmd.PersistentFlags().Lookup("components"))
 	viper.BindPFlag("rules", rootCmd.PersistentFlags().Lookup("rules"))
-	viper.BindPFlag("cache-mode", rootCmd.PersistentFlags().Lookup("cache-mode"))
+	viper.BindPFlag("cache", rootCmd.PersistentFlags().Lookup("cache"))
+	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 
 	// Flag completions
 	rootCmd.RegisterFlagCompletionFunc("components", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

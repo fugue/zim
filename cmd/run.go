@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/fugue/zim/cache"
 	"github.com/fugue/zim/project"
 	"github.com/fugue/zim/sched"
@@ -69,11 +68,6 @@ func NewRunCommand() *cobra.Command {
 				fatal(err)
 			}
 
-			var objStore store.Store
-			if opts.URL != "" {
-				objStore = store.NewHTTP(opts.URL, opts.Token)
-			}
-
 			// Load selected components from the project
 			proj, err := project.NewWithOptions(project.Opts{
 				Root:          opts.Directory,
@@ -91,26 +85,33 @@ func NewRunCommand() *cobra.Command {
 			}
 			buildID := project.UUID()
 
-			// Construct build middleware
+			// Create list of middleware to use
 			var builders []project.RunnerBuilder
 			if opts.Debug {
 				builders = append(builders, project.Debug)
 			}
-			builders = append(builders,
-				project.BufferedOutput,
-				project.Logger,
-			)
-			if objStore != nil {
+			if opts.OutputMode == "buffered" {
+				builders = append(builders, project.BufferedOutput)
+			}
+			builders = append(builders, project.Logger)
+
+			// Add caching middleware depending on configuration
+			if opts.CacheMode == cache.Disabled {
+				fmt.Fprintf(os.Stdout, project.Yellow("Caching is disabled.\n"))
+			} else if opts.URL != "" {
+				objStore := store.NewHTTP(opts.URL, opts.Token)
 				self, err := user.Current()
 				if err != nil {
 					fatal(err)
 				}
-				builders = append(builders, cache.NewMiddleware(
-					objStore, self.Name, opts.CacheMode))
+				builders = append(builders,
+					cache.NewMiddleware(objStore, self.Name, opts.CacheMode))
 			} else {
-				yellow := color.New(color.FgYellow).SprintFunc()
-				fmt.Fprintf(os.Stderr, yellow("Caching is not enabled. See the docs!\n"))
+				fmt.Fprintf(os.Stderr,
+					project.Yellow("Cache URL is not set. See the docs!\n"))
 			}
+
+			// Chain together all middleware
 			runner := project.NewChain(builders...).
 				Then(&project.StandardRunner{})
 

@@ -54,6 +54,7 @@ type zimOptions struct {
 	Components []string
 	Rules      []string
 	Debug      bool
+	OutputMode string
 	Jobs       int
 	CacheMode  string
 	Token      string
@@ -70,8 +71,9 @@ func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 		Rules:      viper.GetStringSlice("rules"),
 		UseDocker:  viper.GetBool("docker"),
 		Debug:      viper.GetBool("debug"),
+		OutputMode: viper.GetString("output"),
 		Jobs:       viper.GetInt("jobs"),
-		CacheMode:  viper.GetString("cache-mode"),
+		CacheMode:  viper.GetString("cache"),
 		Token:      viper.GetString("token"),
 	}
 	if opts.Cache == "" {
