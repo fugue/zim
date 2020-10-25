@@ -14,6 +14,7 @@
 package project
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
@@ -34,6 +35,23 @@ type Command struct {
 	Kind       string
 	Argument   string
 	Attributes map[string]interface{}
+}
+
+// Condition controlling whether a Rule executes
+type Condition struct {
+	ResourceExists string
+	ScriptSucceeds string
+}
+
+// IsEmpty returns true if the condition isn't configured
+func (c Condition) IsEmpty() bool {
+	if c.ResourceExists != "" {
+		return false
+	}
+	if c.ScriptSucceeds != "" {
+		return false
+	}
+	return true
 }
 
 // NewCommands constructs Commands extracted from a rule YAML definition
@@ -78,6 +96,8 @@ type Rule struct {
 	resolvedImports []*Export
 	inProvider      Provider
 	outProvider     Provider
+	when            Condition
+	unless          Condition
 }
 
 // NewRule constructs a Rule from a provided YAML definition
@@ -123,7 +143,14 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 	r.inputs = substituteVarsSlice(r.inputs, variables)
 	r.ignore = substituteVarsSlice(r.ignore, variables)
 	r.outputs = substituteVarsSlice(r.outputs, variables)
-
+	r.when = Condition{
+		ResourceExists: substituteVars(self.When.ResourceExists, variables),
+		ScriptSucceeds: substituteVars(self.When.ScriptSucceeds, variables),
+	}
+	r.unless = Condition{
+		ResourceExists: substituteVars(self.Unless.ResourceExists, variables),
+		ScriptSucceeds: substituteVars(self.Unless.ScriptSucceeds, variables),
+	}
 	return r, nil
 }
 
@@ -359,6 +386,55 @@ func (r *Rule) DependencyOutputs() (outputs Resources) {
 		}
 	}
 	return
+}
+
+// CheckConditions returns true if the Rule should execute based on its conditions
+func (r *Rule) CheckConditions(ctx context.Context, executor Executor) (bool, error) {
+	if !r.when.IsEmpty() {
+		// A when condition is defined
+		whenCondition, err := r.checkCondition(ctx, executor, r.when)
+		if err != nil {
+			return false, err
+		}
+		if !whenCondition {
+			// The "when" condition evaluted to false: condition not met
+			return false, nil
+		}
+	}
+	if !r.unless.IsEmpty() {
+		// An unless condition is defined
+		unlessCondition, err := r.checkCondition(ctx, executor, r.unless)
+		if err != nil {
+			return false, err
+		}
+		if unlessCondition {
+			// The "unless" condition evaluted to true: condition not met
+			return false, nil
+		}
+	}
+	// All conditions met
+	return true, nil
+}
+
+func (r *Rule) checkCondition(ctx context.Context, executor Executor, c Condition) (bool, error) {
+	if c.ResourceExists != "" {
+		resources, err := matchResources(r.Component(), r.inProvider, []string{c.ResourceExists})
+		if err != nil {
+			return false, err
+		}
+		return len(resources) > 0, nil
+	}
+	if c.ScriptSucceeds != "" {
+		err := executor.Execute(ctx, ExecOpts{
+			Command:          c.ScriptSucceeds,
+			WorkingDirectory: r.Component().Directory(),
+			Env:              flattenEnvironment(r.BaseEnvironment()),
+			Image:            r.Image(),
+			Name:             fmt.Sprintf("%s.condition", r.NodeID()),
+		})
+		return err == nil, nil
+	}
+	return true, nil
 }
 
 // Commands that define Rule execution

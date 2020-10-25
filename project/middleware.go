@@ -54,8 +54,8 @@ func Logger(runner Runner) Runner {
 
 		code, err := runner.Run(ctx, r, opts)
 
-		if code == UpToDate {
-			fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()), Green("[CURRENT]"))
+		if code == Skipped {
+			fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()), Green("[SKIPPED]"))
 			return code, err
 		} else if code == Cached {
 			fmt.Fprintln(opts.Output, "rule:", Bright(r.NodeID()), Green("[CACHED]"))

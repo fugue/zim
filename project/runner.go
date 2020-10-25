@@ -63,6 +63,15 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 
 	defaultBashExecutor := NewBashExecutor()
 
+	// Determine whether the rule should run based on its conditions
+	conditionsMet, err := r.CheckConditions(ctx, defaultBashExecutor)
+	if err != nil {
+		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
+	}
+	if !conditionsMet {
+		return Skipped, nil
+	}
+
 	// Determine which executor to use. Prefer the provided one but if the provided
 	// one is Docker-enabled and the rule is native, use a default bash executor instead.
 	executor := opts.Executor

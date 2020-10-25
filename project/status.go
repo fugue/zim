@@ -21,8 +21,8 @@ const (
 	// Error indicates the Rule could not be run
 	Error Code = iota
 
-	// UpToDate indicates the Rule is up-to-date and doesn't need to be run
-	UpToDate
+	// Skipped indicates the Rule was skipped due to a conditional
+	Skipped
 
 	// ExecError indicates Rule execution was attempted but failed
 	ExecError
