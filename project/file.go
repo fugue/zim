@@ -52,6 +52,9 @@ func (fs *FileSystem) Match(pattern string) (Resources, error) {
 		match := path.Join(fs.root, pattern)
 		matchInfo, err := os.Stat(match)
 		if err != nil {
+			if os.IsNotExist(err) {
+				return Resources{}, nil
+			}
 			return nil, fmt.Errorf("Failed to stat input %s: %s",
 				pattern, err)
 		}
