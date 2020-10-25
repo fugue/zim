@@ -318,16 +318,21 @@ func (r *Rule) Outputs() (outputs Resources) {
 	var prefix string
 	switch r.outProvider.(type) {
 	case *FileSystem:
-		if r.local {
-			prefix = r.Component().Directory()
-		} else {
-			prefix = r.Project().ArtifactsDir()
-		}
+		prefix = r.ArtifactsDir()
 	}
 	for _, out := range r.outputs {
 		outputs = append(outputs, r.outProvider.New(path.Join(prefix, out)))
 	}
 	return
+}
+
+// ArtifactsDir returns the absolute path to the directory used for artifacts
+// produced by this Rule.
+func (r *Rule) ArtifactsDir() string {
+	if r.local {
+		return r.Component().Directory()
+	}
+	return r.Project().ArtifactsDir()
 }
 
 // MissingOutputs returns a list of output files that are not currently present
