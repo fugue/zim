@@ -19,6 +19,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
@@ -45,6 +46,16 @@ type Executor interface {
 
 	// UsesDocker indicates whether this executor runs commands in a container
 	UsesDocker() bool
+
+	// ExecutorPath returns the corresponding path within the executor
+	// environment that corresponds to the given path on the host. For
+	// simple executors this will be identical. For executors that run
+	// inside Docker containers, that path will be translated to the
+	// path within the container filesystem. The provided path must be
+	// an absolute path on the host, and the returned path is also an
+	// absolute path. An error is returned if a relative path is provided
+	// or if the host path is not mapped within the executor.
+	ExecutorPath(hostPath string) (string, error)
 }
 
 // NewBashExecutor returns an Executor that runs commands via bash
@@ -68,7 +79,14 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		workingDir = "."
 	}
 
-	bashCmd := exec.CommandContext(ctx, "bash", "-e", "-c", commandText)
+	// Create list of bash options
+	args := []string{"-e"}
+	if opts.Debug {
+		args = extendSlice(args, "-x")
+	}
+	args = extendSlice(args, "-c", commandText)
+
+	bashCmd := exec.CommandContext(ctx, "bash", args...)
 	bashCmd.Env = environment
 	bashCmd.Dir = workingDir
 	bashCmd.Stdout = getWriter(opts.Stdout, os.Stdout)
@@ -78,7 +96,7 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	cmdOut := getWriter(opts.Cmdout, os.Stdout)
 	if opts.Debug {
 		debugColor := color.New(color.FgYellow).SprintFunc()
-		fmt.Fprintln(cmdOut, "dbg:", debugColor(bashCmd.Args))
+		fmt.Fprintln(cmdOut, "dbg:", debugColor(strings.Join(bashCmd.Args, " ")))
 	}
 	cmdColor := color.New(color.FgMagenta).SprintFunc()
 	fmt.Fprintln(cmdOut, "cmd:", cmdColor(commandText))
@@ -88,6 +106,13 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 
 func (e *bashExecutor) UsesDocker() bool {
 	return false
+}
+
+func (e *bashExecutor) ExecutorPath(hostPath string) (string, error) {
+	if !filepath.IsAbs(hostPath) {
+		return "", fmt.Errorf("A relative path was incorrectly passed: %s", hostPath)
+	}
+	return hostPath, nil
 }
 
 func getWriter(override, def io.Writer) io.Writer {

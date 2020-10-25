@@ -27,6 +27,10 @@ import (
 	"github.com/fatih/color"
 )
 
+// DefaultDockerExecutorDir is the path to the execution root within the
+// Docker container
+const DefaultDockerExecutorDir = "/build"
+
 // NewDockerExecutor returns an Executor that runs commands within containers
 func NewDockerExecutor(mountDirectory string) Executor {
 
@@ -41,6 +45,7 @@ func NewDockerExecutor(mountDirectory string) Executor {
 		MountDirectory: mountDirectory,
 		UserID:         userID,
 		GroupID:        groupID,
+		ExecDirectory:  DefaultDockerExecutorDir,
 	}
 }
 
@@ -48,6 +53,7 @@ type dockerExecutor struct {
 	MountDirectory string
 	UserID         string
 	GroupID        string
+	ExecDirectory  string
 }
 
 // Execute runs a command in a container
@@ -82,13 +88,13 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		"--rm",
 		"-t",
 		"--volume",
-		fmt.Sprintf("%s:/build", mountDir),
+		fmt.Sprintf("%s:%s", mountDir, e.ExecDirectory),
 		"--workdir",
-		path.Join("/build", workingRelDir),
+		path.Join(e.ExecDirectory, workingRelDir),
 		"-e",
-		"HOME=/build",
+		fmt.Sprintf("HOME=%s", e.ExecDirectory),
 		"-e",
-		"GOPATH=/build/.go",
+		fmt.Sprintf("GOPATH=%s", path.Join(e.ExecDirectory, ".go")),
 	}
 	if opts.Name != "" {
 		args = extendSlice(args, "--name", opts.Name)
@@ -97,7 +103,7 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		args = extendSlice(args, "--user", fmt.Sprintf("%s:%s", e.UserID, e.GroupID))
 	}
 	if XDGCache() != "" {
-		args = extendSlice(args, "-e", "XDG_CACHE_HOME=/build/.cache")
+		args = extendSlice(args, "-e", fmt.Sprintf("XDG_CACHE_HOME=%s", path.Join(e.ExecDirectory, ".cache")))
 	}
 	if os.Getenv("GOPROXY") != "" {
 		args = extendSlice(args, "-e", fmt.Sprintf("GOPROXY=%s", os.Getenv("GOPROXY")))
@@ -109,7 +115,11 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	for _, envVar := range opts.Env {
 		args = extendSlice(args, "-e", envVar)
 	}
-	args = extendSlice(args, opts.Image, "bash", "-e", "-c", commandText)
+	args = extendSlice(args, opts.Image, "bash", "-e")
+	if opts.Debug {
+		args = extendSlice(args, "-x")
+	}
+	args = extendSlice(args, "-c", commandText)
 
 	dockerCmd := exec.CommandContext(ctx, "docker", args...)
 	dockerCmd.Stdout = getWriter(opts.Stdout, os.Stdout)
@@ -119,7 +129,7 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	cmdOut := getWriter(opts.Cmdout, os.Stdout)
 	if opts.Debug {
 		debugColor := color.New(color.FgYellow).SprintFunc()
-		fmt.Fprintln(cmdOut, "dbg:", debugColor(dockerCmd.Args))
+		fmt.Fprintln(cmdOut, "dbg:", debugColor(strings.Join(dockerCmd.Args, " ")))
 	}
 	cmdColor := color.New(color.FgCyan).SprintFunc()
 	fmt.Fprintln(cmdOut, "cmd:", cmdColor(commandText))
@@ -146,6 +156,20 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 
 func (e *dockerExecutor) UsesDocker() bool {
 	return true
+}
+
+func (e *dockerExecutor) ExecutorPath(hostPath string) (string, error) {
+	if !filepath.IsAbs(hostPath) {
+		return "", fmt.Errorf("A relative path was incorrectly passed: %s", hostPath)
+	}
+	relPath, err := filepath.Rel(e.MountDirectory, hostPath)
+	if err != nil {
+		return "", err
+	}
+	// Append the relative path to the base directory within the container.
+	// For example {repo_path}/src/foo as the `hostPath` could be translated
+	// to /build/src/foo within the container -- {e.ExecDirectory}/src/foo.
+	return filepath.Join(e.ExecDirectory, relPath), nil
 }
 
 func extendSlice(s []string, item ...string) []string {

@@ -14,12 +14,9 @@
 package project
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/fatih/color"
@@ -64,22 +61,42 @@ type StandardRunner struct{}
 // Run a rule with the provided executor and other options
 func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (Code, error) {
 
-	if opts.Executor == nil {
-		// Default to a simple bash executor if another one is not specified
-		opts.Executor = NewBashExecutor()
-	} else if opts.Executor.UsesDocker() && r.native {
-		// The rule is set to "native" which means it is opting out of docker
-		opts.Executor = NewBashExecutor()
+	defaultBashExecutor := NewBashExecutor()
+
+	// Determine which executor to use. Prefer the provided one but if the provided
+	// one is Docker-enabled and the rule is native, use a default bash executor instead.
+	executor := opts.Executor
+	if executor == nil || r.native && executor.UsesDocker() {
+		executor = defaultBashExecutor
 	}
+	isDockerized := !r.native && executor.UsesDocker()
 
 	// Determine the bash environment variables to be available to the execution
-	env, err := r.Environment()
+	bashEnv, err := r.Environment()
 	if err != nil {
 		return Error, fmt.Errorf("Environment error %s: %s", r.NodeID(), err)
 	}
+	// Environment variables are adjusted slightly when the rule runs in Docker.
+	// Set ARTIFACTS_DIR and ARTIFACT environment variables.
+	var dockerEnv map[string]string
+	if isDockerized {
+		dockerEnv = copyEnvironment(bashEnv)
+		if err := runner.setArtifactVariables(r, executor, dockerEnv); err != nil {
+			return Error, err
+		}
+	}
+	if err := runner.setArtifactVariables(r, defaultBashExecutor, bashEnv); err != nil {
+		return Error, err
+	}
 
-	// Execute the rule's commands one at a time
+	// Execute each of the rule's commands
 	for i, cmd := range r.Commands() {
+		// Choose which environment variables depending on whether Docker is used
+		env := bashEnv
+		if cmd.Kind == "run" && isDockerized {
+			env = dockerEnv
+		}
+		// Run the command
 		var execError error
 		switch cmd.Kind {
 		case "run":
@@ -94,6 +111,10 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 			execError = runner.execCleandirCommand(ctx, r, opts, env, cmd, i)
 		case "remove":
 			execError = runner.execRemoveCommand(ctx, r, opts, env, cmd, i)
+		case "move":
+			execError = runner.execMoveCommand(ctx, r, opts, env, cmd, i)
+		case "copy":
+			execError = runner.execCopyCommand(ctx, r, opts, env, cmd, i)
 		default:
 			return Error, fmt.Errorf("Unknown command kind in %s: %s",
 				r.NodeID(), cmd.Kind)
@@ -115,6 +136,32 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		return MissingOutputError, errs.ErrorOrNil()
 	}
 	return OK, nil
+}
+
+// Add absolute paths within the executor to the artifacts directory for
+// this rule and the rule output artifact, if there is one.
+func (runner *StandardRunner) setArtifactVariables(
+	r *Rule,
+	executor Executor,
+	env map[string]string,
+) error {
+	ruleArtifactsDir, err := executor.ExecutorPath(r.ArtifactsDir())
+	if err != nil {
+		return err
+	}
+	env["ARTIFACTS_DIR"] = ruleArtifactsDir
+	ruleOutputs := r.Outputs()
+	if len(ruleOutputs) > 0 {
+		firstRuleOutput := ruleOutputs[0]
+		if firstRuleOutput.OnFilesystem() {
+			artifactPath, err := executor.ExecutorPath(firstRuleOutput.Path())
+			if err != nil {
+				return err
+			}
+			env["ARTIFACT"] = artifactPath
+		}
+	}
+	return nil
 }
 
 // Runs commands in bash
@@ -168,22 +215,16 @@ func (runner *StandardRunner) execZipCommand(
 	if dir != "" {
 		script = fmt.Sprintf("cd %s && %s", dir, script)
 	}
-	buffer := &bytes.Buffer{}
 
-	if err := NewBashExecutor().Execute(ctx, ExecOpts{
+	return NewBashExecutor().Execute(ctx, ExecOpts{
 		Command:          script,
 		WorkingDirectory: r.Component().Directory(),
 		Env:              flattenEnvironment(env),
 		Stdout:           runOpts.Output,
 		Stderr:           runOpts.Output,
 		Debug:            runOpts.Debug,
-		Cmdout:           buffer,
-	}); err != nil {
-		return err
-	}
-	fmt.Fprintln(runOpts.Output, "cmd:",
-		cmdColor.Sprintf("[zip] created %s", output))
-	return nil
+		Cmdout:           runOpts.DebugOutput,
+	})
 }
 
 // Runs the `tar` command to create an archive using gzip if the default options
@@ -208,22 +249,16 @@ func (runner *StandardRunner) execArchiveCommand(
 		return fmt.Errorf("Archive command has no output specified")
 	}
 	script := fmt.Sprintf("tar %s %s %s", opts, output, input)
-	buffer := &bytes.Buffer{}
 
-	if err := NewBashExecutor().Execute(ctx, ExecOpts{
+	return NewBashExecutor().Execute(ctx, ExecOpts{
 		Command:          script,
 		WorkingDirectory: r.Component().Directory(),
 		Env:              flattenEnvironment(env),
 		Stdout:           runOpts.Output,
 		Stderr:           runOpts.Output,
 		Debug:            runOpts.Debug,
-		Cmdout:           buffer,
-	}); err != nil {
-		return err
-	}
-	fmt.Fprintln(runOpts.Output, "cmd:",
-		cmdColor.Sprintf("[archive] created %s", output))
-	return nil
+		Cmdout:           runOpts.DebugOutput,
+	})
 }
 
 // Creates a directory and its parents as needed. Equivalent to `mkdir -p`.
@@ -235,21 +270,22 @@ func (runner *StandardRunner) execMkdirCommand(
 	cmd *Command,
 	cmdIndex int,
 ) error {
-	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+
+	arg := strings.TrimSpace(cmd.Argument)
 	if arg == "" {
-		return fmt.Errorf("mkdir command has no directory specified")
+		return fmt.Errorf("mkdir command has no targets specified")
 	}
-	var dir string
-	if !path.IsAbs(dir) {
-		dir = path.Join(r.Component().Directory(), dir)
-	} else {
-		dir = arg
-	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[mkdir] %s", arg))
-	return nil
+	script := fmt.Sprintf("mkdir -p %s", arg)
+
+	return NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	})
 }
 
 // Ensures an empty directory with the given name exists. If the directory
@@ -263,27 +299,25 @@ func (runner *StandardRunner) execCleandirCommand(
 	cmd *Command,
 	cmdIndex int,
 ) error {
-	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+
+	arg := strings.TrimSpace(cmd.Argument)
 	if arg == "" {
-		return fmt.Errorf("cleandir command has no directory specified")
+		return fmt.Errorf("cleandir command has no targets specified")
 	}
 	if arg == "/" {
 		return fmt.Errorf("cleandir cannot run against /")
 	}
-	var dir string
-	if !path.IsAbs(dir) {
-		dir = path.Join(r.Component().Directory(), arg)
-	} else {
-		dir = arg
-	}
-	if err := os.RemoveAll(dir); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[cleandir] %s", arg))
-	return nil
+	script := fmt.Sprintf("rm -rf %s && mkdir -p %s", arg, arg)
+
+	return NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	})
 }
 
 // Remove one or more files or directories. Equivalent to `rm -rf`.
@@ -295,23 +329,86 @@ func (runner *StandardRunner) execRemoveCommand(
 	cmd *Command,
 	cmdIndex int,
 ) error {
-	arg := substituteVars(strings.TrimSpace(cmd.Argument), env)
+
+	arg := strings.TrimSpace(cmd.Argument)
 	if arg == "" {
-		return fmt.Errorf("rm command has no targets specified")
+		return fmt.Errorf("remove command has no targets specified")
 	}
-	for _, target := range strings.Split(arg, " ") {
-		if target == "/" {
-			return fmt.Errorf("rm cannot run against /")
-		}
-		if !path.IsAbs(target) {
-			target = path.Join(r.Component().Directory(), target)
-		}
-		if err := os.RemoveAll(target); err != nil {
-			return err
-		}
+	script := fmt.Sprintf("rm -rf %s", arg)
+
+	return NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	})
+}
+
+// Move one or more files or directories.
+func (runner *StandardRunner) execMoveCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+
+	src := getCommandAttr(cmd, "src", "")
+	dst := getCommandAttr(cmd, "dst", "")
+
+	if src == "" {
+		return fmt.Errorf("Move command has no src specified")
 	}
-	fmt.Fprintln(runOpts.Output, "cmd:", cmdColor.Sprintf("[remove] %s", arg))
-	return nil
+	if dst == "" {
+		return fmt.Errorf("Move command has no dst specified")
+	}
+	script := fmt.Sprintf("mv %s %s", src, dst)
+
+	return NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	})
+}
+
+// Copy one or more files or directories.
+func (runner *StandardRunner) execCopyCommand(
+	ctx context.Context,
+	r *Rule,
+	runOpts RunOpts,
+	env map[string]string,
+	cmd *Command,
+	cmdIndex int,
+) error {
+
+	src := getCommandAttr(cmd, "src", "")
+	dst := getCommandAttr(cmd, "dst", "")
+
+	if src == "" {
+		return fmt.Errorf("Copy command has no src specified")
+	}
+	if dst == "" {
+		return fmt.Errorf("Copy command has no dst specified")
+	}
+	script := fmt.Sprintf("cp %s %s", src, dst)
+
+	return NewBashExecutor().Execute(ctx, ExecOpts{
+		Command:          script,
+		WorkingDirectory: r.Component().Directory(),
+		Env:              flattenEnvironment(env),
+		Stdout:           runOpts.Output,
+		Stderr:           runOpts.Output,
+		Debug:            runOpts.Debug,
+		Cmdout:           runOpts.DebugOutput,
+	})
 }
 
 func getCommandAttr(cmd *Command, attr, defaultValue string) string {
