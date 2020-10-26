@@ -14,6 +14,7 @@
 package project
 
 import (
+	"context"
 	"os"
 	"path"
 	"testing"
@@ -23,7 +24,8 @@ import (
 )
 
 const (
-	testCompFoo = `name: foo
+	testCompFoo = `
+name: foo
 rules:
   test:
     local: true
@@ -41,7 +43,8 @@ rules:
      - foo
     command: go build -v
 `
-	testCompBar = `name: bar
+	testCompBar = `
+name: bar
 rules:
   build:
     requires:
@@ -58,6 +61,39 @@ rules:
 package main
 import fmt
 func main() { fmt.Println("Hello World!") }
+`
+
+	testCompConditions = `
+name: conditions-test
+rules:
+  build-when-run:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    when:
+      resource_exists: main.go
+  build-when-skip:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    when:
+      resource_exists: missing.go
+  build-unless-skip:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    unless:
+      resource_exists: main.go
+  build-unless-run:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    unless:
+      resource_exists: missing.go
 `
 )
 
@@ -168,4 +204,53 @@ func TestRuleOutputs(t *testing.T) {
 
 	// absOuts := build.OutputsAbs()
 	// assert.Equal(t, []string{path.Join(dir, "artifacts", "bar")}, absOuts)
+}
+
+func TestRuleCondition(t *testing.T) {
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+
+	testComponent(dir, "conditions-test", testCompConditions,
+		map[string]string{
+			"main.go": testGoMain,
+		})
+
+	p, err := New(dir)
+	require.Nil(t, err)
+
+	comp := p.Components().First()
+	require.NotNil(t, comp)
+	require.Equal(t, "conditions-test", comp.Name())
+
+	executor := NewBashExecutor()
+	ctx := context.Background()
+
+	// "when" condition is true
+	build, found := comp.Rule("build-when-run")
+	require.True(t, found)
+	conditionsMet, err := build.CheckConditions(ctx, executor, false)
+	require.Nil(t, err)
+	require.True(t, conditionsMet)
+
+	// "when" condition is false
+	build, found = comp.Rule("build-when-skip")
+	require.True(t, found)
+	conditionsMet, err = build.CheckConditions(ctx, executor, false)
+	require.Nil(t, err)
+	require.False(t, conditionsMet)
+
+	// "unless" condition is false (so the rule should run)
+	build, found = comp.Rule("build-unless-run")
+	require.True(t, found)
+	conditionsMet, err = build.CheckConditions(ctx, executor, false)
+	require.Nil(t, err)
+	require.True(t, conditionsMet)
+
+	// "unless" condition is true (so the rule should NOT run)
+	build, found = comp.Rule("build-unless-skip")
+	require.True(t, found)
+	conditionsMet, err = build.CheckConditions(ctx, executor, false)
+	require.Nil(t, err)
+	require.False(t, conditionsMet)
 }

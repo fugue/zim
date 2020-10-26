@@ -16,6 +16,7 @@ package project
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -64,9 +65,12 @@ func TestStandardRunner(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
+	artifactsDir := filepath.Join(dir, "artifacts")
+	artifactPath := filepath.Join(dir, "artifacts", "myartifact")
+
 	expectedEnv := flattenEnvironment(map[string]string{
-		"ARTIFACT":      filepath.Join(dir, "artifacts", "myartifact"),
-		"ARTIFACTS_DIR": filepath.Join(dir, "artifacts"),
+		"ARTIFACT":      artifactPath,
+		"ARTIFACTS_DIR": artifactsDir,
 		"COMPONENT":     "a",
 		"DEP":           "",
 		"DEPS":          "",
@@ -84,6 +88,9 @@ func TestStandardRunner(t *testing.T) {
 
 	m := NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().AnyTimes()
+	m.EXPECT().ExecutorPath(gomock.Any()).DoAndReturn(func(in string) (string, error) {
+		return in, nil
+	}).AnyTimes()
 	m.EXPECT().Execute(ctx, ExecOpts{
 		Name:             "a.build.0",
 		Command:          "ls ${NAME}",
@@ -105,4 +112,258 @@ func TestStandardRunner(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, OK, code)
+}
+
+func stringSliceAsInterface(s []string) (result []interface{}) {
+	for _, item := range s {
+		result = append(result, item)
+	}
+	return
+}
+
+func commandSliceAsInterface(cmds []map[string]string) (result []interface{}) {
+	for _, item := range cmds {
+		itemIf := make(map[interface{}]interface{})
+		for k, v := range item {
+			itemIf[k] = v
+		}
+		result = append(result, itemIf)
+	}
+	return
+}
+
+func getTestRule(opts Opts, ruleName string) (*Rule, error) {
+	p, err := NewWithOptions(opts)
+	if err != nil {
+		return nil, err
+	}
+	c := p.Components().First()
+	if c == nil {
+		return nil, errors.New("No components found")
+	}
+	rule := c.MustRule(ruleName)
+	if rule == nil {
+		return nil, errors.New("Rule was incorrectly nil")
+	}
+	return rule, nil
+}
+
+func TestStandardRunnerDockerized(t *testing.T) {
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+	cDir, cYaml := testComponentDir(dir, "a")
+	testComponentFile(cDir, "main.go", "package main")
+
+	defs := []*definitions.Component{
+		&definitions.Component{
+			Name: "widget",
+			Path: cYaml,
+			Kind: "flurble",
+			Docker: definitions.Docker{
+				Image: "go:123",
+			},
+			Rules: map[string]definitions.Rule{
+				"twist-it": definitions.Rule{
+					Commands: commandSliceAsInterface([]map[string]string{
+						map[string]string{"run": "echo TWIST IT"},
+						map[string]string{"run": "echo BOP IT"},
+					}),
+				},
+			},
+		},
+	}
+
+	rule, err := getTestRule(Opts{Root: dir, ComponentDefs: defs}, "twist-it")
+	require.Nil(t, err)
+
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	artifactsDir := "some-arbitrary-dir"
+
+	expectedEnv := flattenEnvironment(map[string]string{
+		"ARTIFACTS_DIR": artifactsDir,
+		"COMPONENT":     "widget",
+		"DEP":           "",
+		"DEPS":          "",
+		"INPUT":         "",
+		"OUTPUT":        "",
+		"OUTPUTS":       "",
+		"KIND":          "flurble",
+		"NAME":          "widget",
+		"NODE_ID":       "widget.twist-it",
+		"RULE":          "twist-it",
+	})
+	buf := bytes.Buffer{}
+	var writer io.Writer
+	writer = &buf
+
+	m := NewMockExecutor(ctrl)
+	m.EXPECT().UsesDocker().Return(true).AnyTimes()
+	m.EXPECT().ExecutorPath(rule.ArtifactsDir()).Return(artifactsDir, nil)
+
+	m.EXPECT().Execute(ctx, ExecOpts{
+		Name:             "widget.twist-it.0",
+		Command:          "echo TWIST IT",
+		Image:            "go:123",
+		WorkingDirectory: cDir,
+		Env:              expectedEnv,
+		Stdout:           writer,
+		Stderr:           writer,
+	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+		return nil
+	})
+
+	m.EXPECT().Execute(ctx, ExecOpts{
+		Name:             "widget.twist-it.1",
+		Command:          "echo BOP IT",
+		Image:            "go:123",
+		WorkingDirectory: cDir,
+		Env:              expectedEnv,
+		Stdout:           writer,
+		Stderr:           writer,
+	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+		return nil
+	})
+
+	runner := &StandardRunner{}
+	code, err := runner.Run(ctx, rule, RunOpts{
+		BuildID:  "777",
+		Executor: m,
+		Output:   writer,
+	})
+	require.Nil(t, err)
+	require.Equal(t, OK, code)
+}
+
+func TestStandardRunnerWhenCondition(t *testing.T) {
+
+	// Tests that rule execution is skipped due to a "when" condition
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+	cDir, cYaml := testComponentDir(dir, "a")
+	testComponentFile(cDir, "main.go", "package main")
+
+	defs := []*definitions.Component{
+		&definitions.Component{
+			Name: "widget",
+			Path: cYaml,
+			Kind: "flurble",
+			Rules: map[string]definitions.Rule{
+				"twist-it": definitions.Rule{
+					When: definitions.Condition{
+						ScriptSucceeds: "exit 1", // Prevents execution
+					},
+					Commands: commandSliceAsInterface([]map[string]string{
+						map[string]string{"run": "echo TWIST IT"},
+					}),
+				},
+			},
+		},
+	}
+
+	rule, err := getTestRule(Opts{Root: dir, ComponentDefs: defs}, "twist-it")
+	require.Nil(t, err)
+
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	m := NewMockExecutor(ctrl)
+
+	expectedEnv := flattenEnvironment(map[string]string{
+		"COMPONENT": "widget",
+		"KIND":      "flurble",
+		"NAME":      "widget",
+		"NODE_ID":   "widget.twist-it",
+		"RULE":      "twist-it",
+	})
+
+	m.EXPECT().UsesDocker().Return(false).AnyTimes()
+	m.EXPECT().Execute(ctx, ExecOpts{
+		Command:          "exit 1",
+		WorkingDirectory: cDir,
+		Env:              expectedEnv,
+		Image:            "",
+		Name:             "widget.twist-it.condition",
+	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+		return errors.New("Exiting with 1")
+	})
+
+	runner := &StandardRunner{}
+	code, err := runner.Run(ctx, rule, RunOpts{
+		BuildID:  "777",
+		Executor: m,
+		Output:   &bytes.Buffer{},
+	})
+	require.Nil(t, err)
+	require.Equal(t, Skipped, code)
+}
+
+func TestStandardRunnerUnlessCondition(t *testing.T) {
+
+	// Tests that rule execution is skipped due to an "unless" condition
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+	cDir, cYaml := testComponentDir(dir, "a")
+	testComponentFile(cDir, "main.go", "package main")
+
+	defs := []*definitions.Component{
+		&definitions.Component{
+			Name: "widget",
+			Path: cYaml,
+			Kind: "flurble",
+			Rules: map[string]definitions.Rule{
+				"twist-it": definitions.Rule{
+					Unless: definitions.Condition{
+						ScriptSucceeds: "exit 0", // Prevents execution
+					},
+					Commands: commandSliceAsInterface([]map[string]string{
+						map[string]string{"run": "echo TWIST IT"},
+					}),
+				},
+			},
+		},
+	}
+
+	rule, err := getTestRule(Opts{Root: dir, ComponentDefs: defs}, "twist-it")
+	require.Nil(t, err)
+
+	ctx := context.Background()
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	m := NewMockExecutor(ctrl)
+
+	expectedEnv := flattenEnvironment(map[string]string{
+		"COMPONENT": "widget",
+		"KIND":      "flurble",
+		"NAME":      "widget",
+		"NODE_ID":   "widget.twist-it",
+		"RULE":      "twist-it",
+	})
+
+	m.EXPECT().UsesDocker().Return(false).AnyTimes()
+	m.EXPECT().ExecutorPath(gomock.Any()).Return("ignored", nil).AnyTimes()
+	m.EXPECT().Execute(ctx, ExecOpts{
+		Command:          "exit 0",
+		WorkingDirectory: cDir,
+		Env:              expectedEnv,
+		Image:            "",
+		Name:             "widget.twist-it.condition",
+	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+		// Return nil corresponds to running a script that exits without error
+		return nil
+	})
+
+	runner := &StandardRunner{}
+	code, err := runner.Run(ctx, rule, RunOpts{
+		BuildID:  "777",
+		Executor: m,
+		Output:   &bytes.Buffer{},
+	})
+	require.Nil(t, err)
+	require.Equal(t, Skipped, code)
 }

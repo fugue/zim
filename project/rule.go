@@ -389,10 +389,10 @@ func (r *Rule) DependencyOutputs() (outputs Resources) {
 }
 
 // CheckConditions returns true if the Rule should execute based on its conditions
-func (r *Rule) CheckConditions(ctx context.Context, executor Executor) (bool, error) {
+func (r *Rule) CheckConditions(ctx context.Context, executor Executor, debug bool) (bool, error) {
 	if !r.when.IsEmpty() {
 		// A when condition is defined
-		whenCondition, err := r.checkCondition(ctx, executor, r.when)
+		whenCondition, err := r.checkCondition(ctx, executor, debug, r.when)
 		if err != nil {
 			return false, err
 		}
@@ -403,7 +403,7 @@ func (r *Rule) CheckConditions(ctx context.Context, executor Executor) (bool, er
 	}
 	if !r.unless.IsEmpty() {
 		// An unless condition is defined
-		unlessCondition, err := r.checkCondition(ctx, executor, r.unless)
+		unlessCondition, err := r.checkCondition(ctx, executor, debug, r.unless)
 		if err != nil {
 			return false, err
 		}
@@ -416,8 +416,10 @@ func (r *Rule) CheckConditions(ctx context.Context, executor Executor) (bool, er
 	return true, nil
 }
 
-func (r *Rule) checkCondition(ctx context.Context, executor Executor, c Condition) (bool, error) {
+func (r *Rule) checkCondition(ctx context.Context, executor Executor, debug bool, c Condition) (bool, error) {
 	if c.ResourceExists != "" {
+		// The "resource exists" condition evaluates to true if one or more resources
+		// match the provided filename or glob pattern
 		resources, err := matchResources(r.Component(), r.inProvider, []string{c.ResourceExists})
 		if err != nil {
 			return false, err
@@ -425,12 +427,15 @@ func (r *Rule) checkCondition(ctx context.Context, executor Executor, c Conditio
 		return len(resources) > 0, nil
 	}
 	if c.ScriptSucceeds != "" {
+		// The "script succeeds" condition evaluates to true if the specified shell
+		// command exits without error when run in bash
 		err := executor.Execute(ctx, ExecOpts{
 			Command:          c.ScriptSucceeds,
 			WorkingDirectory: r.Component().Directory(),
 			Env:              flattenEnvironment(r.BaseEnvironment()),
 			Image:            r.Image(),
 			Name:             fmt.Sprintf("%s.condition", r.NodeID()),
+			Debug:            debug,
 		})
 		return err == nil, nil
 	}
