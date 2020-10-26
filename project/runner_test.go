@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/fugue/zim/definitions"
@@ -64,16 +65,18 @@ func TestStandardRunner(t *testing.T) {
 	defer ctrl.Finish()
 
 	expectedEnv := flattenEnvironment(map[string]string{
-		"COMPONENT": "a",
-		"DEP":       "",
-		"DEPS":      "",
-		"INPUT":     "main.go",
-		"KIND":      "flurble",
-		"NAME":      "a",
-		"NODE_ID":   "a.build",
-		"OUTPUT":    "../../artifacts/myartifact",
-		"OUTPUTS":   "../../artifacts/myartifact",
-		"RULE":      "build",
+		"ARTIFACT":      filepath.Join(dir, "artifacts", "myartifact"),
+		"ARTIFACTS_DIR": filepath.Join(dir, "artifacts"),
+		"COMPONENT":     "a",
+		"DEP":           "",
+		"DEPS":          "",
+		"INPUT":         "main.go",
+		"KIND":          "flurble",
+		"NAME":          "a",
+		"NODE_ID":       "a.build",
+		"OUTPUT":        "../../artifacts/myartifact",
+		"OUTPUTS":       "../../artifacts/myartifact",
+		"RULE":          "build",
 	})
 	buf := bytes.Buffer{}
 	var writer io.Writer

@@ -1,3 +1,5 @@
+// +build docker-test
+
 package project
 
 import (
