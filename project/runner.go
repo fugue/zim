@@ -70,13 +70,13 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		bashExecutor = NewBashExecutor()
 	}
 
-	// Determine the primary executor to be used for running commands.
-	// This is the provided one, or a bash executor by default.
+	// Determine the primary executor to be used for "run" commands.
+	// Use the provided one unless it conflicts in terms of native vs. docker.
 	var primaryExecutor Executor
-	if opts.Executor != nil {
-		primaryExecutor = opts.Executor
-	} else {
+	if opts.Executor == nil || (r.IsNative() && opts.Executor.UsesDocker()) {
 		primaryExecutor = bashExecutor
+	} else {
+		primaryExecutor = opts.Executor
 	}
 
 	// Evaluate rule conditions which could lead to rule execution being skipped
@@ -109,7 +109,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		env := bashEnv
 		exec := bashExecutor
 		if cmd.Kind == "run" {
-			// Run commands use the primary environment variables
+			// Run commands use the primary environment and executor
 			env = primaryEnv
 			exec = primaryExecutor
 		}
