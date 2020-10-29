@@ -8,3 +8,4 @@ signer.zip
 auth.zip
 samconfig.toml
 venv
+coverage.out

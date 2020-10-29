@@ -268,6 +268,8 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 	rule, err := getTestRule(Opts{Root: dir, ComponentDefs: defs}, "twist-it")
 	require.Nil(t, err)
 
+	var outputBuffer bytes.Buffer
+
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -288,6 +290,8 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 		Env:              expectedEnv,
 		Image:            "",
 		Name:             "widget.twist-it.condition",
+		Stdout:           &outputBuffer,
+		Stderr:           &outputBuffer,
 	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
 		return errors.New("Exiting with 1")
 	})
@@ -296,7 +300,7 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 	code, err := runner.Run(ctx, rule, RunOpts{
 		BuildID:  "777",
 		Executor: m,
-		Output:   &bytes.Buffer{},
+		Output:   &outputBuffer,
 	})
 	require.Nil(t, err)
 	require.Equal(t, Skipped, code)
@@ -332,6 +336,8 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	rule, err := getTestRule(Opts{Root: dir, ComponentDefs: defs}, "twist-it")
 	require.Nil(t, err)
 
+	var outputBuffer bytes.Buffer
+
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -353,6 +359,8 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 		Env:              expectedEnv,
 		Image:            "",
 		Name:             "widget.twist-it.condition",
+		Stdout:           &outputBuffer,
+		Stderr:           &outputBuffer,
 	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
 		// Return nil corresponds to running a script that exits without error
 		return nil
@@ -362,7 +370,7 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	code, err := runner.Run(ctx, rule, RunOpts{
 		BuildID:  "777",
 		Executor: m,
-		Output:   &bytes.Buffer{},
+		Output:   &outputBuffer,
 	})
 	require.Nil(t, err)
 	require.Equal(t, Skipped, code)

@@ -79,8 +79,9 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		primaryExecutor = opts.Executor
 	}
 
-	// Evaluate rule conditions which could lead to rule execution being skipped
-	conditionsMet, err := r.CheckConditions(ctx, bashExecutor, opts.Debug)
+	// Evaluate rule conditions which could lead to rule execution being skipped.
+	// Any scripting done to check the condition will be via the bash executor.
+	conditionsMet, err := CheckConditions(ctx, r, opts, bashExecutor)
 	if err != nil {
 		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
 	}
