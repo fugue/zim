@@ -255,7 +255,10 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 			Rules: map[string]definitions.Rule{
 				"twist-it": definitions.Rule{
 					When: definitions.Condition{
-						ScriptSucceeds: "exit 1", // Prevents execution
+						ScriptSucceeds: definitions.ConditionScript{
+							Run:           "exit 1", // Prevents execution
+							SuppressError: true,
+						},
 					},
 					Commands: commandSliceAsInterface([]map[string]string{
 						map[string]string{"run": "echo TWIST IT"},
@@ -323,7 +326,9 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 			Rules: map[string]definitions.Rule{
 				"twist-it": definitions.Rule{
 					Unless: definitions.Condition{
-						ScriptSucceeds: "exit 0", // Prevents execution
+						ScriptSucceeds: definitions.ConditionScript{
+							Run: "exit 0", // Prevents execution
+						},
 					},
 					Commands: commandSliceAsInterface([]map[string]string{
 						map[string]string{"run": "echo TWIST IT"},

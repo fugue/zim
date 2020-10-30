@@ -36,23 +36,6 @@ type Command struct {
 	Attributes map[string]interface{}
 }
 
-// Condition controlling whether a Rule executes
-type Condition struct {
-	ResourceExists string
-	ScriptSucceeds string
-}
-
-// IsEmpty returns true if the condition isn't configured
-func (c Condition) IsEmpty() bool {
-	if c.ResourceExists != "" {
-		return false
-	}
-	if c.ScriptSucceeds != "" {
-		return false
-	}
-	return true
-}
-
 // NewCommands constructs Commands extracted from a rule YAML definition
 func NewCommands(self *definitions.Rule) (result []*Command, err error) {
 	defCommands, err := self.GetCommands()
@@ -144,11 +127,19 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 	r.outputs = substituteVarsSlice(r.outputs, variables)
 	r.when = Condition{
 		ResourceExists: substituteVars(self.When.ResourceExists, variables),
-		ScriptSucceeds: substituteVars(self.When.ScriptSucceeds, variables),
+		ScriptSucceeds: ConditionScript{
+			Run:           substituteVars(self.When.ScriptSucceeds.Run, variables),
+			WithOutput:    substituteVars(self.When.ScriptSucceeds.WithOutput, variables),
+			SuppressError: self.When.ScriptSucceeds.SuppressError,
+		},
 	}
 	r.unless = Condition{
 		ResourceExists: substituteVars(self.Unless.ResourceExists, variables),
-		ScriptSucceeds: substituteVars(self.Unless.ScriptSucceeds, variables),
+		ScriptSucceeds: ConditionScript{
+			Run:           substituteVars(self.Unless.ScriptSucceeds.Run, variables),
+			WithOutput:    substituteVars(self.Unless.ScriptSucceeds.WithOutput, variables),
+			SuppressError: self.Unless.ScriptSucceeds.SuppressError,
+		},
 	}
 	return r, nil
 }

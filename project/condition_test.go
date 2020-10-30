@@ -16,6 +16,7 @@ package project
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -75,4 +76,101 @@ func TestRuleCondition(t *testing.T) {
 	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor)
 	require.Nil(t, err)
 	require.False(t, conditionsMet)
+}
+
+func TestConditionScript(t *testing.T) {
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+	ctx := context.Background()
+	executor := NewBashExecutor()
+
+	c := &Component{name: "test-comp", componentDir: dir}
+	r := &Rule{component: c, name: "test-rule"}
+
+	type test struct {
+		input   Condition
+		want    bool
+		wantErr error
+	}
+
+	// Test cases for various permutations of ConditionScripts
+	tests := []test{
+		{
+			input: Condition{
+				ScriptSucceeds: ConditionScript{
+					Run:        "echo FOO",
+					WithOutput: "FOO",
+				},
+			},
+			want:    true,
+			wantErr: nil,
+		},
+		{
+			input: Condition{
+				ScriptSucceeds: ConditionScript{
+					Run: "echo FOO",
+				},
+			},
+			want:    true,
+			wantErr: nil,
+		},
+		{
+			input: Condition{
+				ScriptSucceeds: ConditionScript{
+					Run:        "echo NOPE",
+					WithOutput: "FOO",
+				},
+			},
+			want:    false,
+			wantErr: nil,
+		},
+		{
+			input: Condition{
+				ScriptSucceeds: ConditionScript{
+					Run:           "exit 1",
+					SuppressError: true,
+				},
+			},
+			want:    false,
+			wantErr: nil,
+		},
+		{
+			input: Condition{
+				ScriptSucceeds: ConditionScript{
+					Run: "exit 42",
+				},
+			},
+			want:    false,
+			wantErr: fmt.Errorf("exit status 42"),
+		},
+		{
+			input:   Condition{},
+			want:    true,
+			wantErr: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		var stdout bytes.Buffer
+		runOpts := RunOpts{
+			Output:      &stdout,
+			DebugOutput: &stdout,
+			Debug:       false,
+		}
+		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor)
+		if conditionsMet != tc.want {
+			t.Errorf("expected: %v, got: %v", tc.want, conditionsMet)
+		}
+		if errStringOrEmpty(err) != errStringOrEmpty(tc.wantErr) {
+			t.Errorf("expected: %v, got: %v", tc.wantErr, err)
+		}
+	}
+}
+
+func errStringOrEmpty(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return ""
 }

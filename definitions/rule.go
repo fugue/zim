@@ -32,10 +32,22 @@ type Providers struct {
 	Outputs string `yaml:"outputs"`
 }
 
+// ConditionScript defines a script to be used to check a Condition
+type ConditionScript struct {
+	Run           string `yaml:"run"`
+	WithOutput    string `yaml:"with_output"`
+	SuppressError bool   `yaml:"suppress_error"`
+}
+
+// IsEmpty returns true if the Script is not defined
+func (s ConditionScript) IsEmpty() bool {
+	return s.Run == ""
+}
+
 // Condition that controls rule or command execution
 type Condition struct {
-	ResourceExists string `yaml:"resource_exists"`
-	ScriptSucceeds string `yaml:"script_succeeds"`
+	ResourceExists string          `yaml:"resource_exists"`
+	ScriptSucceeds ConditionScript `yaml:"script_succeeds"`
 }
 
 // Rule defines inputs, commands, and outputs for a build step or action
@@ -202,7 +214,7 @@ func mergeConditions(a, b Condition) (result Condition) {
 	if b.ResourceExists != "" {
 		result.ResourceExists = b.ResourceExists
 	}
-	if b.ScriptSucceeds != "" {
+	if !b.ScriptSucceeds.IsEmpty() {
 		result.ScriptSucceeds = b.ScriptSucceeds
 	}
 	return
