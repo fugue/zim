@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -379,4 +380,184 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, Skipped, code)
+}
+
+func TestRunnerBuiltIns(t *testing.T) {
+
+	dir := testDir()
+	// defer os.RemoveAll(dir)
+	fmt.Println(dir)
+	ctx := context.Background()
+	executor := NewBashExecutor()
+	runner := &StandardRunner{}
+
+	testComponentFile(dir, "main.go", "package main")
+
+	c := &Component{name: "test-comp", componentDir: dir}
+	r := &Rule{component: c, name: "test-rule", local: true}
+
+	type test struct {
+		input     Command
+		checkFunc func() (bool, error)
+		wantErr   error
+	}
+
+	// Sequence of commands and a test for each.
+	// These test cases ARE intentionally dependent on each other!
+	tests := []test{
+		// Create a zip file
+		{
+			input: Command{
+				Kind: "zip",
+				Attributes: map[string]interface{}{
+					"input":  "main.go",
+					"output": "main.go.zip",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "main.go.zip")), nil
+			},
+			wantErr: nil,
+		},
+		// Remove main.go which is now in the zip
+		{
+			input: Command{
+				Kind:     "remove",
+				Argument: "main.go",
+			},
+			checkFunc: func() (bool, error) {
+				return !fileExists(filepath.Join(dir, "main.go")), nil
+			},
+			wantErr: nil,
+		},
+		// Unzip to get main.go back
+		{
+			input: Command{
+				Kind: "unzip",
+				Attributes: map[string]interface{}{
+					"input": "main.go.zip",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "main.go")), nil
+			},
+			wantErr: nil,
+		},
+		// Archive main.go next
+		{
+			input: Command{
+				Kind: "archive",
+				Attributes: map[string]interface{}{
+					"input":  "main.go",
+					"output": "main.go.tgz",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "main.go.tgz")), nil
+			},
+			wantErr: nil,
+		},
+		// Move main.go to main.go.bak
+		{
+			input: Command{
+				Kind: "move",
+				Attributes: map[string]interface{}{
+					"src": "main.go",
+					"dst": "main.go.bak",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return (fileExists(filepath.Join(dir, "main.go.bak")) &&
+					!fileExists(filepath.Join(dir, "main.go"))), nil
+			},
+			wantErr: nil,
+		},
+		// Unarchive main.go.tgz to get main.go back
+		{
+			input: Command{
+				Kind: "unarchive",
+				Attributes: map[string]interface{}{
+					"input": "main.go.tgz",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "main.go")), nil
+			},
+			wantErr: nil,
+		},
+		// Create an empty directory
+		{
+			input: Command{
+				Kind:     "mkdir",
+				Argument: "the-directory",
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "the-directory")), nil
+			},
+			wantErr: nil,
+		},
+		// Create a file in the directory
+		{
+			input: Command{
+				Kind:     "run",
+				Argument: "touch the-directory/foo",
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "the-directory/foo")), nil
+			},
+			wantErr: nil,
+		},
+		// Copy the directory to a new location
+		{
+			input: Command{
+				Kind: "copy",
+				Attributes: map[string]interface{}{
+					"src": "the-directory",
+					"dst": "the-directory-copy",
+				},
+			},
+			checkFunc: func() (bool, error) {
+				return fileExists(filepath.Join(dir, "the-directory-copy/foo")), nil
+			},
+			wantErr: nil,
+		},
+		// Clean the directory
+		{
+			input: Command{
+				Kind:     "cleandir",
+				Argument: "the-directory-copy",
+			},
+			checkFunc: func() (bool, error) {
+				return (fileExists(filepath.Join(dir, "the-directory-copys")) &&
+					!fileExists(filepath.Join(dir, "the-directory-copy/foo"))), nil
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		var stdout bytes.Buffer
+		opts := RunOpts{
+			Executor:    executor,
+			Output:      &stdout,
+			DebugOutput: &stdout,
+			Debug:       true,
+		}
+		r.commands = []*Command{&tc.input}
+		code, err := runner.Run(ctx, r, opts)
+		if errStringOrEmpty(err) != errStringOrEmpty(tc.wantErr) {
+			t.Errorf("expected: %v, got: %v", tc.wantErr, err)
+		}
+		if code != OK {
+			fmt.Println(stdout.String())
+			t.Errorf("expected code to be ok for %+v", tc.input)
+		}
+		ok, err := tc.checkFunc()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			t.Errorf("Check failed on %+v", tc.input)
+		}
+	}
 }

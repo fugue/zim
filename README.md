@@ -397,7 +397,7 @@ rules:
       - zip:
           cd: dist
           input: "."
-          output: ../${OUTPUT}
+          output: ${ARTIFACT}
 ```
 
 Available built-ins:
@@ -412,20 +412,21 @@ Available built-ins:
  * `copy` - copy files or directories (cp -R)
    * `src` - source locations
    * `dst` - destination locations
- * `zip` - create a zip archive. Parameters as follows:
+   * `options` - cp command options (default `-R`)
+ * `zip` - create a zip archive
    * `options` - zip command options (default `-qrFS`)
    * `input` - path to input files (default `.`)
    * `output` - required zip output path
    * `cd` - optional directory to cd into before running the command
- * `unzip` - unzip an archive.
+ * `unzip` - unzip an archive
    * `options` - unzip command options (default `-qo`)
    * `input` - path to the zip file
    * `output` - optional directory to extract into
- * `archive` - create a tgz archive. Parameters as follows:
+ * `archive` - create a tgz archive
    * `options` - tar command options (default `-czf`)
    * `input` - required path(s) to input files
    * `output` - required path to output tgz
- * `unarchive` - unpack a tgz archive.
+ * `unarchive` - unpack a tgz archive
    * `options` - tar command options (default `-xzf`)
    * `input` - path to the tgz
    * `output` - optional directory to extract into

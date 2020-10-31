@@ -152,8 +152,8 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 				r.NodeID(), cmd.Kind)
 		}
 		if execError != nil {
-			return ExecError, fmt.Errorf("Error running rule command. Rule: %s. Error: %s",
-				r.NodeID(), execError)
+			return ExecError, fmt.Errorf("Error running rule command. Rule: %s. Command: %+v. Error: %s",
+				r.NodeID(), cmd, execError)
 		}
 	}
 
@@ -384,13 +384,18 @@ func (runner *StandardRunner) execCopyCommand(
 ) error {
 	src := getCommandAttr(cmd, "src", "")
 	dst := getCommandAttr(cmd, "dst", "")
+	opts := getCommandAttr(cmd, "options", "-R")
 	if src == "" {
 		return fmt.Errorf("Copy command has no src specified")
 	}
 	if dst == "" {
 		return fmt.Errorf("Copy command has no dst specified")
 	}
-	execOpts.Command = fmt.Sprintf("cp %s %s", src, dst)
+	args := fmt.Sprintf("%s %s", src, dst)
+	if opts != "" {
+		args = fmt.Sprintf("%s %s", opts, args)
+	}
+	execOpts.Command = fmt.Sprintf("cp %s", args)
 	return executor.Execute(ctx, execOpts)
 }
 
