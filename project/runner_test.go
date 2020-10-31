@@ -528,7 +528,7 @@ func TestRunnerBuiltIns(t *testing.T) {
 				Argument: "the-directory-copy",
 			},
 			checkFunc: func() (bool, error) {
-				return (fileExists(filepath.Join(dir, "the-directory-copys")) &&
+				return (fileExists(filepath.Join(dir, "the-directory-copy")) &&
 					!fileExists(filepath.Join(dir, "the-directory-copy/foo"))), nil
 			},
 			wantErr: nil,
