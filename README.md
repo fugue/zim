@@ -369,6 +369,8 @@ Rule commands some context:
  * `OUTPUTS` - relative paths to all outputs (space separated)
  * `DEP` - the relative path to the first dependency
  * `DEPS` - relative paths to all dependencies (space separated)
+ * `ARTIFACTS_DIR` - absolute path to directory where outputs are placed
+ * `ARTIFACT` - absolute path to the first output
 
 As a trivial example, if a Rule lists "*.go" as an input and the Component has
 one Go file in the directory named "main.go", then `INPUT=main.go` is set in
@@ -404,15 +406,29 @@ Available built-ins:
  * `mkdir` - creates a directory and its parents as needed (mkdir -p)
  * `cleandir` - removes and recreates the directory (rm -rf then mkdir -p)
  * `remove` - removes files or directories (rm -rf)
+ * `move` - relocate files or directories (mv)
+   * `src` - source locations
+   * `dst` - destination locations
+ * `copy` - copy files or directories (cp -R)
+   * `src` - source locations
+   * `dst` - destination locations
  * `zip` - create a zip archive. Parameters as follows:
    * `options` - zip command options (default `-qrFS`)
    * `input` - path to input files (default `.`)
    * `output` - required zip output path
    * `cd` - optional directory to cd into before running the command
+ * `unzip` - unzip an archive.
+   * `options` - unzip command options (default `-qo`)
+   * `input` - path to the zip file
+   * `output` - optional directory to extract into
  * `archive` - create a tgz archive. Parameters as follows:
    * `options` - tar command options (default `-czf`)
    * `input` - required path(s) to input files
    * `output` - required path to output tgz
+ * `unarchive` - unpack a tgz archive.
+   * `options` - tar command options (default `-xzf`)
+   * `input` - path to the tgz
+   * `output` - optional directory to extract into
 
 These built-ins execute on the build host, not in the container, when a
 Component is Docker-enabled. This is helpful to avoid I/O performance penalties

@@ -131,8 +131,12 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 			execError = runner.execRunCommand(ctx, r, exec, execOpts, cmd)
 		case "zip":
 			execError = runner.execZipCommand(ctx, r, exec, execOpts, cmd)
+		case "unzip":
+			execError = runner.execUnzipCommand(ctx, r, exec, execOpts, cmd)
 		case "archive":
 			execError = runner.execArchiveCommand(ctx, r, exec, execOpts, cmd)
+		case "unarchive":
+			execError = runner.execUnarchiveCommand(ctx, r, exec, execOpts, cmd)
 		case "mkdir":
 			execError = runner.execMkdirCommand(ctx, r, exec, execOpts, cmd)
 		case "cleandir":
@@ -230,6 +234,28 @@ func (runner *StandardRunner) execZipCommand(
 	return executor.Execute(ctx, execOpts)
 }
 
+// Unzips a zip archive. By default, the options `-qo` are used.
+func (runner *StandardRunner) execUnzipCommand(
+	ctx context.Context,
+	r *Rule,
+	executor Executor,
+	execOpts ExecOpts,
+	cmd *Command,
+) error {
+	opts := getCommandAttr(cmd, "options", "-qo")
+	input := getCommandAttr(cmd, "input", "")
+	output := getCommandAttr(cmd, "output", "")
+	if input == "" {
+		return fmt.Errorf("Unzip command has no input specified")
+	}
+	script := fmt.Sprintf("unzip %s %s", opts, input)
+	if output != "" {
+		script = fmt.Sprintf("%s -d %s", script, output)
+	}
+	execOpts.Command = script
+	return executor.Execute(ctx, execOpts)
+}
+
 // Runs the `tar` command to create an archive using gzip if the default options
 // are used. Equivalent to `tar -czf $OUTPUT $INPUT`.
 func (runner *StandardRunner) execArchiveCommand(
@@ -249,6 +275,29 @@ func (runner *StandardRunner) execArchiveCommand(
 		return fmt.Errorf("Archive command has no output specified")
 	}
 	execOpts.Command = fmt.Sprintf("tar %s %s %s", opts, output, input)
+	return executor.Execute(ctx, execOpts)
+}
+
+// Runs the `tar` command to extract an archive.
+// Equivalent to `tar -xzf $OUTPUT $INPUT`.
+func (runner *StandardRunner) execUnarchiveCommand(
+	ctx context.Context,
+	r *Rule,
+	executor Executor,
+	execOpts ExecOpts,
+	cmd *Command,
+) error {
+	opts := getCommandAttr(cmd, "options", "-xzf")
+	input := getCommandAttr(cmd, "input", "")
+	output := getCommandAttr(cmd, "output", "")
+	if input == "" {
+		return fmt.Errorf("Archive command has no input specified")
+	}
+	script := fmt.Sprintf("tar %s %s", opts, input)
+	if output != "" {
+		script = fmt.Sprintf("mkdir -p %s && %s -C %s", output, script, output)
+	}
+	execOpts.Command = script
 	return executor.Execute(ctx, execOpts)
 }
 
