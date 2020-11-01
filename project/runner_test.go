@@ -82,6 +82,7 @@ func TestStandardRunner(t *testing.T) {
 		"OUTPUT":        "../../artifacts/myartifact",
 		"OUTPUTS":       "../../artifacts/myartifact",
 		"RULE":          "build",
+		"ROOT":          dir,
 	})
 	buf := bytes.Buffer{}
 	var writer io.Writer
@@ -196,6 +197,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 		"NAME":          "widget",
 		"NODE_ID":       "widget.twist-it",
 		"RULE":          "twist-it",
+		"ROOT":          dir,
 	})
 	buf := bytes.Buffer{}
 	var writer io.Writer
@@ -203,6 +205,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 
 	m := NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().Return(true).AnyTimes()
+	m.EXPECT().ExecutorPath(dir).Return(dir, nil)
 	m.EXPECT().ExecutorPath(rule.ArtifactsDir()).Return(artifactsDir, nil)
 
 	m.EXPECT().Execute(ctx, ExecOpts{
@@ -393,7 +396,8 @@ func TestRunnerBuiltIns(t *testing.T) {
 
 	testComponentFile(dir, "main.go", "package main")
 
-	c := &Component{name: "test-comp", componentDir: dir}
+	p := &Project{rootAbs: dir}
+	c := &Component{name: "test-comp", componentDir: dir, project: p}
 	r := &Rule{component: c, name: "test-rule", local: true}
 
 	type test struct {

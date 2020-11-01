@@ -315,7 +315,7 @@ func (r *Rule) Image() string {
 
 // IsNative returns true if Docker execution is disabled on this rule
 func (r *Rule) IsNative() bool {
-	return r.native
+	return r.native || r.Image() == ""
 }
 
 // Dependencies of this rule. In order for this to Rule to run, its

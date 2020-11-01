@@ -171,18 +171,30 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	return OK, nil
 }
 
-// Add absolute paths within the executor to the artifacts directory for
-// this rule and the rule output artifact, if there is one.
+// Add absolute paths within the executor to the root of the project, the
+// artifacts directory for this rule, and the rule output artifact, if there
+// is one. We delegate figuring out the paths to the executor since it knows
+// the path within the Docker container, if Docker is being used.
 func (runner *StandardRunner) setArtifactVariables(
 	r *Rule,
 	executor Executor,
 	env map[string]string,
 ) error {
+	// Absolute path to the root of the project
+	projectRoot, err := executor.ExecutorPath(r.Component().Project().RootAbsPath())
+	if err != nil {
+		return err
+	}
+	env["ROOT"] = projectRoot
+
+	// Absolute path to the project artifacts directory
 	ruleArtifactsDir, err := executor.ExecutorPath(r.ArtifactsDir())
 	if err != nil {
 		return err
 	}
 	env["ARTIFACTS_DIR"] = ruleArtifactsDir
+
+	// Absolute path to the first rule output, if the rule has an output
 	ruleOutputs := r.Outputs()
 	if len(ruleOutputs) > 0 {
 		firstRuleOutput := ruleOutputs[0]

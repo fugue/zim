@@ -371,6 +371,7 @@ Rule commands some context:
  * `DEPS` - relative paths to all dependencies (space separated)
  * `ARTIFACTS_DIR` - absolute path to directory where outputs are placed
  * `ARTIFACT` - absolute path to the first output
+ * `ROOT` - absolute path to the root of the project
 
 As a trivial example, if a Rule lists "*.go" as an input and the Component has
 one Go file in the directory named "main.go", then `INPUT=main.go` is set in
