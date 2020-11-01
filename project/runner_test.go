@@ -388,8 +388,7 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 func TestRunnerBuiltIns(t *testing.T) {
 
 	dir := testDir()
-	// defer os.RemoveAll(dir)
-	fmt.Println(dir)
+	defer os.RemoveAll(dir)
 	ctx := context.Background()
 	executor := NewBashExecutor()
 	runner := &StandardRunner{}

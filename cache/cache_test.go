@@ -90,9 +90,15 @@ func TestCacheKey(t *testing.T) {
 		},
 	}
 
+	executor := &project.FakeExecutor{
+		Docker:  true,
+		Wrapped: project.NewBashExecutor(),
+	}
+
 	p, err := project.NewWithOptions(project.Opts{
 		Root:          repoDir,
 		ComponentDefs: []*definitions.Component{cDef},
+		Executor:      executor,
 	})
 	require.Nil(t, err)
 
@@ -123,4 +129,55 @@ func TestCacheKey(t *testing.T) {
 	// Known / golden values
 	assert.Equal(t, "76210a1b69110fbab4368f0943451c43d132dbf2", key1Str)
 	assert.Equal(t, "dfc17112c86e320d733966fd38da435e4a0804c6", key2Str)
+}
+
+func TestCacheKeyNonDocker(t *testing.T) {
+
+	ctx := context.Background()
+
+	tmpDir, err := ioutil.TempDir("", "zim-testing-")
+	require.Nil(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	cDir := path.Join(tmpDir, "my-component")
+	require.Nil(t, os.MkdirAll(cDir, 0755))
+	srcPath := path.Join(cDir, "main.go")
+	ioutil.WriteFile(srcPath, []byte("some source code"), 0644)
+
+	cDef := &definitions.Component{
+		Name: "my-component",
+		Path: path.Join(cDir, "component.yaml"),
+		Rules: map[string]definitions.Rule{
+			"test": definitions.Rule{
+				Inputs:  []string{"main.go"},
+				Outputs: []string{"my-exe"},
+				Command: "touch my-exe",
+			},
+		},
+	}
+
+	p, err := project.NewWithOptions(project.Opts{
+		ProjectDef: &definitions.Project{
+			Name: "test-project",
+		},
+		Root:          tmpDir,
+		ComponentDefs: []*definitions.Component{cDef},
+	})
+	require.Nil(t, err)
+
+	c := p.Components().WithName("my-component").First()
+	require.NotNil(t, c)
+	testRule := c.MustRule("test")
+
+	cache := New(nil)
+
+	key, err := cache.Key(ctx, testRule)
+	require.Nil(t, err, "Error getting cache key")
+	keyStr := key.String()
+
+	// js, _ := json.MarshalIndent(key, "", "  ")
+	// fmt.Println(string(js))
+
+	// Known / golden values
+	assert.Equal(t, "a7c87a2e99c0bbc18b3afbbd65737d8538f33111", keyStr)
 }
