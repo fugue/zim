@@ -239,7 +239,25 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 	ctx := context.Background()
 	res := map[string]string{}
 
-	usingDocker := p.executor.UsesDocker()
+	// Get an appropriate executor for the Component in terms of whether it is
+	// Docker enabled. Use the Project executor by default, if it is compatible.
+	var executor Executor
+	if c.dockerImage != "" {
+		// Component is Docker-enabled
+		if !p.executor.UsesDocker() {
+			return nil, fmt.Errorf("Component %s is Docker-enabled but the executor is not Dockerized", c.Name())
+		}
+		executor = p.executor
+	} else {
+		// Component is not using Docker
+		if p.executor.UsesDocker() {
+			executor = NewBashExecutor()
+		} else {
+			executor = p.executor
+		}
+	}
+
+	usingDocker := executor.UsesDocker()
 	toolchainKey := func(command string) string {
 		if usingDocker {
 			return fmt.Sprintf("%s.%s", c.dockerImage, command)
@@ -256,7 +274,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 		}
 		buf := bytes.Buffer{}
 		ignore := bytes.Buffer{}
-		if err := p.executor.Execute(ctx, ExecOpts{
+		if err := executor.Execute(ctx, ExecOpts{
 			Image:   c.dockerImage,
 			Command: item.Command,
 			Stdout:  &buf,
@@ -268,7 +286,6 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 		res[item.Name] = value
 		p.toolchain[key] = value
 	}
-
 	return res, nil
 }
 

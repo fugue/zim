@@ -13,26 +13,24 @@
 // limitations under the License.
 package project
 
-// Code indicates the scheduling result for a Rule
-type Code int
-
-const (
-
-	// Error indicates the Rule could not be run
-	Error Code = iota
-
-	// Skipped indicates the Rule was skipped due to a conditional
-	Skipped
-
-	// ExecError indicates Rule execution was attempted but failed
-	ExecError
-
-	// MissingOutputError indicates a Rule output was not produced
-	MissingOutputError
-
-	// OK indicates that the Rule executed successfully
-	OK
-
-	// Cached indicates the Rule artifact was cached
-	Cached
+import (
+	"context"
 )
+
+// FakeExecutor wraps another Executor and allows overriding the UsesDocker result
+type FakeExecutor struct {
+	Docker  bool
+	Wrapped Executor
+}
+
+func (e *FakeExecutor) Execute(ctx context.Context, opts ExecOpts) error {
+	return e.Wrapped.Execute(ctx, opts)
+}
+
+func (e *FakeExecutor) UsesDocker() bool {
+	return e.Docker
+}
+
+func (e *FakeExecutor) ExecutorPath(hostPath string) (string, error) {
+	return e.Wrapped.ExecutorPath(hostPath)
+}

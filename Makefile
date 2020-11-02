@@ -79,11 +79,11 @@ clean:
 
 .PHONY: test
 test:
-	$(GO) test -v -cover ./project ./graph ./sched ./git ./cache ./format
+	$(GO) test -v -cover ./...
 
 .PHONY: coverage
 coverage:
-	go test ./project ./graph ./sched ./git -coverprofile=coverage.out
+	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out
 
 .PHONY: mocks

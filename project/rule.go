@@ -78,6 +78,8 @@ type Rule struct {
 	resolvedImports []*Export
 	inProvider      Provider
 	outProvider     Provider
+	when            Condition
+	unless          Condition
 }
 
 // NewRule constructs a Rule from a provided YAML definition
@@ -123,7 +125,22 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 	r.inputs = substituteVarsSlice(r.inputs, variables)
 	r.ignore = substituteVarsSlice(r.ignore, variables)
 	r.outputs = substituteVarsSlice(r.outputs, variables)
-
+	r.when = Condition{
+		ResourceExists: substituteVars(self.When.ResourceExists, variables),
+		ScriptSucceeds: ConditionScript{
+			Run:           substituteVars(self.When.ScriptSucceeds.Run, variables),
+			WithOutput:    substituteVars(self.When.ScriptSucceeds.WithOutput, variables),
+			SuppressError: self.When.ScriptSucceeds.SuppressError,
+		},
+	}
+	r.unless = Condition{
+		ResourceExists: substituteVars(self.Unless.ResourceExists, variables),
+		ScriptSucceeds: ConditionScript{
+			Run:           substituteVars(self.Unless.ScriptSucceeds.Run, variables),
+			WithOutput:    substituteVars(self.Unless.ScriptSucceeds.WithOutput, variables),
+			SuppressError: self.Unless.ScriptSucceeds.SuppressError,
+		},
+	}
 	return r, nil
 }
 
@@ -298,7 +315,7 @@ func (r *Rule) Image() string {
 
 // IsNative returns true if Docker execution is disabled on this rule
 func (r *Rule) IsNative() bool {
-	return r.native
+	return r.native || r.Image() == ""
 }
 
 // Dependencies of this rule. In order for this to Rule to run, its
@@ -318,16 +335,21 @@ func (r *Rule) Outputs() (outputs Resources) {
 	var prefix string
 	switch r.outProvider.(type) {
 	case *FileSystem:
-		if r.local {
-			prefix = r.Component().Directory()
-		} else {
-			prefix = r.Project().ArtifactsDir()
-		}
+		prefix = r.ArtifactsDir()
 	}
 	for _, out := range r.outputs {
 		outputs = append(outputs, r.outProvider.New(path.Join(prefix, out)))
 	}
 	return
+}
+
+// ArtifactsDir returns the absolute path to the directory used for artifacts
+// produced by this Rule.
+func (r *Rule) ArtifactsDir() string {
+	if r.local {
+		return r.Component().Directory()
+	}
+	return r.Project().ArtifactsDir()
 }
 
 // MissingOutputs returns a list of output files that are not currently present

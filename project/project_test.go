@@ -19,6 +19,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/fugue/zim/definitions"
@@ -45,6 +46,7 @@ func testComponent(root, name, def string, files map[string]string) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		panic(err)
 	}
+	def = strings.TrimSpace(def)
 	if err := writeFile(path.Join(dir, "component.yaml"), def); err != nil {
 		panic(err)
 	}

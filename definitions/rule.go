@@ -32,6 +32,24 @@ type Providers struct {
 	Outputs string `yaml:"outputs"`
 }
 
+// ConditionScript defines a script to be used to check a Condition
+type ConditionScript struct {
+	Run           string `yaml:"run"`
+	WithOutput    string `yaml:"with_output"`
+	SuppressError bool   `yaml:"suppress_error"`
+}
+
+// IsEmpty returns true if the Script is not defined
+func (s ConditionScript) IsEmpty() bool {
+	return s.Run == ""
+}
+
+// Condition that controls rule or command execution
+type Condition struct {
+	ResourceExists string          `yaml:"resource_exists"`
+	ScriptSucceeds ConditionScript `yaml:"script_succeeds"`
+}
+
 // Rule defines inputs, commands, and outputs for a build step or action
 type Rule struct {
 	Name        string        `yaml:"name"`
@@ -45,6 +63,8 @@ type Rule struct {
 	Command     string        `yaml:"command"`
 	Commands    []interface{} `yaml:"commands"`
 	Providers   Providers     `yaml:"providers"`
+	When        Condition     `yaml:"when"`
+	Unless      Condition     `yaml:"unless"`
 }
 
 // GetCommands returns commands unmarshaled from the rule's semi-structured YAML
@@ -138,6 +158,8 @@ func mergeRule(a, b Rule) Rule {
 			Inputs:  mergeStr(a.Providers.Inputs, b.Providers.Inputs),
 			Outputs: mergeStr(a.Providers.Outputs, b.Providers.Outputs),
 		},
+		When:   mergeConditions(a.When, b.When),
+		Unless: mergeConditions(a.Unless, b.Unless),
 	}
 }
 
@@ -182,6 +204,18 @@ func mergeCommands(a, b []interface{}) (result []interface{}) {
 	}
 	for _, cmd := range a {
 		result = append(result, cmd)
+	}
+	return
+}
+
+func mergeConditions(a, b Condition) (result Condition) {
+	result.ResourceExists = a.ResourceExists
+	result.ScriptSucceeds = a.ScriptSucceeds
+	if b.ResourceExists != "" {
+		result.ResourceExists = b.ResourceExists
+	}
+	if !b.ScriptSucceeds.IsEmpty() {
+		result.ScriptSucceeds = b.ScriptSucceeds
 	}
 	return
 }

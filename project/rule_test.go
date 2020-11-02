@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	testCompFoo = `name: foo
+	testCompFoo = `
+name: foo
 rules:
   test:
     local: true
@@ -41,7 +42,8 @@ rules:
      - foo
     command: go build -v
 `
-	testCompBar = `name: bar
+	testCompBar = `
+name: bar
 rules:
   build:
     requires:
@@ -58,6 +60,39 @@ rules:
 package main
 import fmt
 func main() { fmt.Println("Hello World!") }
+`
+
+	testCompConditions = `
+name: conditions-test
+rules:
+  build-when-run:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    when:
+      resource_exists: main.go
+  build-when-skip:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    when:
+      resource_exists: missing.go
+  build-unless-skip:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    unless:
+      resource_exists: main.go
+  build-unless-run:
+    inputs:
+     - main.go
+    outputs:
+     - bar
+    unless:
+      resource_exists: missing.go
 `
 )
 
