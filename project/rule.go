@@ -422,17 +422,11 @@ func (r *Rule) Inputs() (Resources, error) {
 
 	// Find resources imported from other Components
 	for _, imp := range r.resolvedImports {
-		imports, err := matchResources(imp.Component, imp.Provider, imp.Resources)
+		imports, err := imp.Resolve()
 		if err != nil {
 			return nil, fmt.Errorf("Failed to find import: %s", err)
 		}
 		add(imports)
-
-		ignored, err := matchResources(imp.Component, imp.Provider, imp.Ignore)
-		if err != nil {
-			return nil, fmt.Errorf("Failed to ignore: %s", err)
-		}
-		ignore(ignored)
 	}
 
 	// Return the input resources, less the ignored ones
