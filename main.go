@@ -16,8 +16,27 @@ package main
 //go:generate mockgen -source=project/runner.go -package project -destination project/runner_mock.go
 //go:generate mockgen -source=project/exec.go -package project -destination project/exec_mock.go
 
-import "github.com/fugue/zim/cmd"
+import (
+	"log"
+	"os"
+	"runtime/pprof"
+
+	"github.com/fugue/zim/cmd"
+)
 
 func main() {
+
+	if os.Getenv("ZIM_PROFILE") == "1" {
+		f, err := os.Create("cpuprofile.out")
+		if err != nil {
+			log.Fatal("could not create CPU profile: ", err)
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			log.Fatal("could not start CPU profile: ", err)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
 	cmd.Execute()
 }
