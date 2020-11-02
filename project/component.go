@@ -107,14 +107,6 @@ type Toolchain struct {
 	Items []ToolchainItem
 }
 
-// Export defines resources exposed by a Component
-type Export struct {
-	Component *Component
-	Provider  Provider
-	Resources []string
-	Ignore    []string
-}
-
 // Component to build and deploy in a repository
 type Component struct {
 	project      *Project
