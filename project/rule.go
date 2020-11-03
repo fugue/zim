@@ -386,39 +386,24 @@ func (r *Rule) Commands() []*Command {
 // Inputs returns Resources that are used to build this Rule
 func (r *Rule) Inputs() (Resources, error) {
 
-	addedPaths := map[string]bool{}
-	ignoredPaths := map[string]bool{}
-	var resources []Resource
+	var inputs, ignore []string
 
-	add := func(adding Resources) {
-		for _, r := range adding {
-			rPath := r.Path()
-			if !addedPaths[rPath] {
-				resources = append(resources, r)
-				addedPaths[rPath] = true
-			}
-		}
-	}
-
-	ignore := func(removing Resources) {
-		for _, r := range removing {
-			ignoredPaths[r.Path()] = true
-		}
+	c := r.Component()
+	if r.HasFileInputs() {
+		// Transform paths from relative to the component to relative to the
+		// top-level of the project. This is needed for the filesystem provider.
+		inputs = joinPaths(c.RelPath(), r.inputs)
+		ignore = joinPaths(c.RelPath(), r.ignore)
+	} else {
+		inputs = r.inputs
+		ignore = r.ignore
 	}
 
 	// Find input resources
-	inputs, err := matchResources(r.Component(), r.inProvider, r.inputs)
+	resources, err := r.inProvider.Match(inputs, ignore)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find input: %s", err)
 	}
-	add(inputs)
-
-	// Exclude ignored resources
-	ignored, err := matchResources(r.Component(), r.inProvider, r.ignore)
-	if err != nil {
-		return nil, fmt.Errorf("Failed ignore: %s", err)
-	}
-	ignore(ignored)
 
 	// Find resources imported from other Components
 	for _, imp := range r.resolvedImports {
@@ -426,26 +411,14 @@ func (r *Rule) Inputs() (Resources, error) {
 		if err != nil {
 			return nil, fmt.Errorf("Failed to find import: %s", err)
 		}
-		add(imports)
+		resources = append(resources, imports...)
 	}
 
-	// Return the input resources, less the ignored ones
-	result := make(Resources, 0, len(resources))
-	for _, r := range resources {
-		if !ignoredPaths[r.Path()] {
-			result = append(result, r)
-		}
-	}
-	return result, nil
+	return resources, nil
 }
 
-func matchResources(c *Component, p Provider, patterns []string) (result Resources, err error) {
-	for _, pat := range patterns {
-		matches, err := p.Match(path.Join(c.RelPath(), pat))
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, matches...)
-	}
-	return
+// HasFileInputs returns true if the rule inputs are files on the filesystem
+func (r *Rule) HasFileInputs() bool {
+	_, ok := r.inProvider.(*FileSystem)
+	return ok
 }

@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
+	"path/filepath"
 	"time"
 )
 
@@ -47,31 +47,18 @@ func (fs *FileSystem) New(path string) Resource {
 }
 
 // Match files by name
-func (fs *FileSystem) Match(pattern string) (Resources, error) {
-	if !strings.Contains(pattern, "*") {
-		match := path.Join(fs.root, pattern)
-		matchInfo, err := os.Stat(match)
+func (fs *FileSystem) Match(patterns, ignore []string) (Resources, error) {
+	var resources Resources
+	for _, pattern := range patterns {
+		matches, err := Glob(filepath.Join(fs.root, pattern))
 		if err != nil {
-			if os.IsNotExist(err) {
-				return Resources{}, nil
-			}
-			return nil, fmt.Errorf("Failed to stat input %s: %s",
-				pattern, err)
+			return nil, fmt.Errorf("Failed to match resources %s: %s", pattern, err)
 		}
-		if matchInfo.IsDir() {
-			return nil, fmt.Errorf("Input cannot be a dir: %s", pattern)
+		for _, match := range matches {
+			resources = append(resources, fs.New(match))
 		}
-		return Resources{fs.New(match)}, nil
 	}
-	matches, err := MatchFiles(fs.root, pattern)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to match resources %s: %s", pattern, err)
-	}
-	rs := make(Resources, 0, len(matches))
-	for _, match := range matches {
-		rs = append(rs, fs.New(match))
-	}
-	return rs, nil
+	return resources, nil
 }
 
 // File implements the Resource interface

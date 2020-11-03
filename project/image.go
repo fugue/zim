@@ -67,19 +67,21 @@ func (d *Docker) New(path string) Resource {
 
 // Match existing Docker images according to the given pattern.
 // Example patterns: "foo", "foo:latest", etc.
-func (d *Docker) Match(pattern string) (r Resources, err error) {
+func (d *Docker) Match(patterns, ignore []string) (r Resources, err error) {
 	ctx := context.Background()
-	images, err := d.FindImages(ctx, pattern)
-	if err != nil {
-		return nil, err
-	}
-	r = make(Resources, 0, len(images))
-	for _, summary := range images {
-		r = append(r, &Image{
-			docker:  d,
-			name:    pattern,
-			summary: summary,
-		})
+	for _, pattern := range patterns {
+		images, err := d.FindImages(ctx, pattern)
+		if err != nil {
+			return nil, err
+		}
+		r = make(Resources, 0, len(images))
+		for _, summary := range images {
+			r = append(r, &Image{
+				docker:  d,
+				name:    pattern,
+				summary: summary,
+			})
+		}
 	}
 	return
 }

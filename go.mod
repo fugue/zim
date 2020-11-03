@@ -24,6 +24,7 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/hashicorp/go-multierror v1.0.0
+	github.com/karrick/godirwalk v1.16.1
 	github.com/mattn/go-colorable v0.1.1 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect

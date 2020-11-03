@@ -26,5 +26,5 @@ type Provider interface {
 	New(path string) Resource
 
 	// Match Resources according to the given pattern
-	Match(pattern string) (Resources, error)
+	Match(patterns, ignore []string) (Resources, error)
 }

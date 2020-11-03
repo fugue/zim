@@ -396,8 +396,16 @@ func TestRunnerBuiltIns(t *testing.T) {
 	testComponentFile(dir, "main.go", "package main")
 
 	p := &Project{rootAbs: dir}
+	provider, err := p.Provider("file")
+	require.Nil(t, err)
+
 	c := &Component{name: "test-comp", componentDir: dir, project: p}
-	r := &Rule{component: c, name: "test-rule", local: true}
+	r := &Rule{
+		component:  c,
+		name:       "test-rule",
+		local:      true,
+		inProvider: provider,
+	}
 
 	type test struct {
 		input     Command

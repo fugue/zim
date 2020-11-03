@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -121,4 +122,12 @@ func copyStrings(input []string) []string {
 	result := make([]string, len(input))
 	copy(result, input)
 	return result
+}
+
+func joinPaths(prefix string, paths []string) (result []string) {
+	result = make([]string, 0, len(paths))
+	for _, path := range paths {
+		result = append(result, filepath.Join(prefix, path))
+	}
+	return
 }

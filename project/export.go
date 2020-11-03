@@ -32,7 +32,7 @@ func (e *Export) Resolve() (Resources, error) {
 	}
 
 	// Discover exported resources
-	matches, err := matchResources(e.Component, e.Provider, e.Resources)
+	matches, err := e.Provider.Match(e.Resources, nil)
 	if err != nil {
 		e.resolved = true
 		e.resolvedError = err
@@ -40,7 +40,7 @@ func (e *Export) Resolve() (Resources, error) {
 	}
 
 	// Exclude ignored resources
-	ignored, err := matchResources(e.Component, e.Provider, e.Ignore)
+	ignored, err := e.Provider.Match(e.Ignore, nil)
 	if err != nil {
 		e.resolved = true
 		e.resolvedError = err

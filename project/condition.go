@@ -100,7 +100,7 @@ func CheckCondition(
 	if c.ResourceExists != "" {
 		// The "resource exists" condition evaluates to true if one or more resources
 		// match the provided filename or glob pattern
-		resources, err := matchResources(r.Component(), r.inProvider, []string{c.ResourceExists})
+		resources, err := r.inProvider.Match([]string{c.ResourceExists}, nil)
 		if err != nil {
 			return false, err
 		}
