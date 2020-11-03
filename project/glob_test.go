@@ -15,7 +15,6 @@ package project
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -97,7 +96,7 @@ func TestGlob(t *testing.T) {
 	for _, tc := range tests {
 		pat := filepath.Join(dir, tc.pattern)
 		result, err := Glob(pat)
-		fmt.Println(pat, result, err)
+		// fmt.Println(pat, result, err)
 		require.Nil(t, err)
 		require.Equal(t, tc.want, result)
 	}

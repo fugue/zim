@@ -211,3 +211,19 @@ func splitPathParts(splitStr string, pathParts []string) ([]string, []string) {
 	rest := pathParts[consumed:]
 	return base, rest
 }
+
+// Returns true if the pattern is a "simple" double star glob, e.g. "**/*_test.go".
+// Also, the suffix is returned if it is one of these patterns.
+func isSimpleDoubleStar(pattern string) (bool, string) {
+	if !strings.HasPrefix(pattern, "**/*") {
+		return false, ""
+	}
+	if strings.Count(pattern, "/") != 1 {
+		return false, ""
+	}
+	if strings.Count(pattern, "*") != 3 {
+		return false, ""
+	}
+	suffix := pattern[len("**/*"):]
+	return true, suffix
+}

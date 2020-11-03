@@ -386,21 +386,11 @@ func (r *Rule) Commands() []*Command {
 // Inputs returns Resources that are used to build this Rule
 func (r *Rule) Inputs() (Resources, error) {
 
-	var inputs, ignore []string
-
-	c := r.Component()
-	if r.HasFileInputs() {
-		// Transform paths from relative to the component to relative to the
-		// top-level of the project. This is needed for the filesystem provider.
-		inputs = joinPaths(c.RelPath(), r.inputs)
-		ignore = joinPaths(c.RelPath(), r.ignore)
-	} else {
-		inputs = r.inputs
-		ignore = r.ignore
-	}
+	// Get input and ignore patterns, relative to this Rule's Component dir
+	inputs, ignores := r.relativeInputs(r.inputs, r.ignore)
 
 	// Find input resources
-	resources, err := r.inProvider.Match(inputs, ignore)
+	resources, err := r.inProvider.Match(inputs, ignores)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to find input: %s", err)
 	}
@@ -421,4 +411,14 @@ func (r *Rule) Inputs() (Resources, error) {
 func (r *Rule) HasFileInputs() bool {
 	_, ok := r.inProvider.(*FileSystem)
 	return ok
+}
+
+func (r *Rule) relativeInputs(inputs, ignores []string) ([]string, []string) {
+	c := r.Component()
+	if r.HasFileInputs() {
+		// Transform paths from relative to the component to relative to the
+		// top-level of the project. This is needed for the filesystem provider.
+		return joinPaths(c.RelPath(), inputs), joinPaths(c.RelPath(), ignores)
+	}
+	return inputs, ignores
 }

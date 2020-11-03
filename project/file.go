@@ -18,6 +18,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -47,17 +49,50 @@ func (fs *FileSystem) New(path string) Resource {
 }
 
 // Match files by name
-func (fs *FileSystem) Match(patterns, ignore []string) (Resources, error) {
-	var resources Resources
+func (fs *FileSystem) Match(patterns, ignores []string) (Resources, error) {
+
+	paths := map[string]bool{}
 	for _, pattern := range patterns {
 		matches, err := Glob(filepath.Join(fs.root, pattern))
 		if err != nil {
 			return nil, fmt.Errorf("Failed to match resources %s: %s", pattern, err)
 		}
 		for _, match := range matches {
-			resources = append(resources, fs.New(match))
+			paths[match] = true
 		}
 	}
+
+	// Process ignores
+	for _, ignore := range ignores {
+		// Highly optimized case: "**/*suffix"
+		isDoubleStar, suffix := isSimpleDoubleStar(ignore)
+		if isDoubleStar {
+			fmt.Println("YES!", suffix)
+			for path := range paths {
+				if strings.HasSuffix(path, suffix) {
+					paths[path] = false
+				}
+			}
+		} else { // Less optimized case: anything else
+			matches, err := Glob(filepath.Join(fs.root, ignore))
+			if err != nil {
+				return nil, fmt.Errorf("Failed to match resources %s: %s", ignore, err)
+			}
+			for _, match := range matches {
+				paths[match] = false
+			}
+		}
+	}
+
+	resources := make(Resources, 0, len(paths))
+	for path, retained := range paths {
+		if retained {
+			resources = append(resources, fs.New(path))
+		}
+	}
+	sort.Slice(resources, func(i, j int) bool {
+		return resources[i].Path() < resources[j].Path()
+	})
 	return resources, nil
 }
 

@@ -98,9 +98,11 @@ func CheckCondition(
 ) (bool, error) {
 
 	if c.ResourceExists != "" {
+		// Convert resource path to be relative to the Component dir
+		relPaths, _ := r.relativeInputs([]string{c.ResourceExists}, nil)
 		// The "resource exists" condition evaluates to true if one or more resources
 		// match the provided filename or glob pattern
-		resources, err := r.inProvider.Match([]string{c.ResourceExists}, nil)
+		resources, err := r.inProvider.Match(relPaths, nil)
 		if err != nil {
 			return false, err
 		}
