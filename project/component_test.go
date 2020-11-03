@@ -151,8 +151,8 @@ func TestNewComponentRule(t *testing.T) {
 
 	if !reflect.DeepEqual(inputs.Paths(), []string{
 		path.Join(dir, "src/foo/foo.go"),
-		path.Join(dir, "src/foo/main.go"),
 		path.Join(dir, "src/foo/go.mod"),
+		path.Join(dir, "src/foo/main.go"),
 	}) {
 		t.Error("Incorrect inputs:", inputs.Paths())
 	}
