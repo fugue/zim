@@ -67,7 +67,6 @@ func (fs *FileSystem) Match(patterns, ignores []string) (Resources, error) {
 		// Highly optimized case: "**/*suffix"
 		isDoubleStar, suffix := isSimpleDoubleStar(ignore)
 		if isDoubleStar {
-			fmt.Println("YES!", suffix)
 			for path := range paths {
 				if strings.HasSuffix(path, suffix) {
 					paths[path] = false

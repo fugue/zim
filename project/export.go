@@ -31,41 +31,23 @@ func (e *Export) Resolve() (Resources, error) {
 		return e.resolvedResources, e.resolvedError
 	}
 
+	// The exported resource paths are relative to their Component.
+	// Prepend the Component path to the path patterns.
+	cDir := e.Component.RelPath()
+
 	// Discover exported resources
-	matches, err := e.Provider.Match(e.Resources, nil)
+	resources, err := e.Provider.Match(
+		joinPaths(cDir, e.Resources),
+		joinPaths(cDir, e.Ignore))
+
+	e.resolved = true
 	if err != nil {
-		e.resolved = true
+		e.resolvedResources = nil
 		e.resolvedError = err
 		return nil, err
 	}
-
-	// Exclude ignored resources
-	ignored, err := e.Provider.Match(e.Ignore, nil)
-	if err != nil {
-		e.resolved = true
-		e.resolvedError = err
-		return nil, err
-	}
-
-	addedPaths := map[string]bool{}
-	ignoredPaths := map[string]bool{}
-	var resources []Resource
-
-	for _, r := range ignored {
-		ignoredPaths[r.Path()] = true
-	}
-
-	for _, r := range matches {
-		rPath := r.Path()
-		if !addedPaths[rPath] && !ignoredPaths[rPath] {
-			resources = append(resources, r)
-			addedPaths[rPath] = true
-		}
-	}
-
-	// Save the resources for future calls
+	// Cache the resources for future calls
 	e.resolvedResources = resources
 	e.resolvedError = nil
-	e.resolved = true
 	return resources, nil
 }
