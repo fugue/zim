@@ -104,7 +104,7 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 		}
 	} else {
 		for _, pattern := range componentPatterns {
-			matches, err := MatchFiles(root, pattern)
+			matches, err := Glob(filepath.Join(root, pattern))
 			if err != nil {
 				return nil, nil, err
 			}

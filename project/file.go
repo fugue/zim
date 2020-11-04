@@ -19,7 +19,6 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -52,6 +51,8 @@ func (fs *FileSystem) New(path string) Resource {
 func (fs *FileSystem) Match(patterns, ignores []string) (Resources, error) {
 
 	paths := map[string]bool{}
+
+	// Find files matching the given patterns and note their paths
 	for _, pattern := range patterns {
 		matches, err := Glob(filepath.Join(fs.root, pattern))
 		if err != nil {
@@ -62,33 +63,26 @@ func (fs *FileSystem) Match(patterns, ignores []string) (Resources, error) {
 		}
 	}
 
-	// Process ignores
+	// Find files matching the ignore patterns and mark their paths ignored
 	for _, ignore := range ignores {
-		// Highly optimized case: "**/*suffix"
-		isDoubleStar, suffix := isSimpleDoubleStar(ignore)
-		if isDoubleStar {
-			for path := range paths {
-				if strings.HasSuffix(path, suffix) {
-					paths[path] = false
-				}
-			}
-		} else { // Less optimized case: anything else
-			matches, err := Glob(filepath.Join(fs.root, ignore))
-			if err != nil {
-				return nil, fmt.Errorf("Failed to match resources %s: %s", ignore, err)
-			}
-			for _, match := range matches {
-				paths[match] = false
-			}
+		matches, err := Glob(filepath.Join(fs.root, ignore))
+		if err != nil {
+			return nil, fmt.Errorf("Failed to match resources %s: %s", ignore, err)
+		}
+		for _, match := range matches {
+			paths[match] = false
 		}
 	}
 
+	// Create a resource for each remaining file
 	resources := make(Resources, 0, len(paths))
 	for path, retained := range paths {
 		if retained {
 			resources = append(resources, fs.New(path))
 		}
 	}
+
+	// Returned sorted file resources
 	sort.Slice(resources, func(i, j int) bool {
 		return resources[i].Path() < resources[j].Path()
 	})
