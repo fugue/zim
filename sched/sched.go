@@ -129,14 +129,14 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 	// Execute rules until no more are available
 	for rulesFinished < rulesCount {
 
-		// Receive results from workers. This select waits for up to 20 ms so
+		// Receive results from workers. This select waits for up to 10 ms so
 		// that we're not in a hard loop here while rules are running.
 		select {
 		case result := <-results:
 			ruleDone(result.Rule, result.Error)
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(20 * time.Millisecond):
+		case <-time.After(10 * time.Millisecond):
 		}
 
 		// Pick rules in the graph that have no remaining "from" edges.
