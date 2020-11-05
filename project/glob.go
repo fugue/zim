@@ -51,9 +51,8 @@ func Glob(pattern string) ([]string, error) {
 	}
 
 	// If we made it to this point, it means there is one "**" in the pattern.
-	// We will intentionally only handle simple forms of this for now, since
-	// this search is the most intensive aspect of Zim execution in many cases.
-	// Specifically, we'll support the following forms:
+	// We will intentionally only handle simple forms of this for now:
+	//
 	//  1. src/** (every file under src, recursively)
 	//  2. src/**/* (equivalent to the above)
 	//  3. src/**/*suffix (every file under src with the suffix, recursively)
@@ -63,7 +62,7 @@ func Glob(pattern string) ([]string, error) {
 	// Disallow a single star preceding a double star
 	singleStarIndex := strings.Index(pattern, "*")
 	doubleStarIndex := strings.Index(pattern, "**")
-	if singleStarIndex >= 0 && singleStarIndex < doubleStarIndex {
+	if singleStarIndex < doubleStarIndex {
 		return nil, fmt.Errorf("Invalid pattern: %s", pattern)
 	}
 
@@ -71,11 +70,10 @@ func Glob(pattern string) ([]string, error) {
 	parts := strings.Split(pattern, "/")
 
 	// Disallow a double star joined to any other string (e.g. foo** or **foo)
-	if doubleStarIndex > 0 && pattern[doubleStarIndex-1] != filepath.Separator {
-		return nil, fmt.Errorf("Invalid pattern: %s", pattern)
-	}
-	if doubleStarIndex < len(pattern)-2 && pattern[doubleStarIndex+2] != filepath.Separator {
-		return nil, fmt.Errorf("Invalid pattern: %s", pattern)
+	for _, part := range parts {
+		if strings.Contains(part, "**") && part != "**" {
+			return nil, fmt.Errorf("Invalid pattern: %s", pattern)
+		}
 	}
 
 	// The base is the path prefix preceding the "**"
@@ -93,27 +91,24 @@ func Glob(pattern string) ([]string, error) {
 		return nil, fmt.Errorf("Invalid pattern suffix: %s", badSuffix)
 	}
 
-	// Recursively search on double stars only
-	lastPatternPart := rest[len(rest)-1]
+	// Set namePattern to the last component of the path, if not just a wildcard
+	lastPart := rest[len(rest)-1]
 	var namePattern string
-	if lastPatternPart != "*" && lastPatternPart != "**" {
-		namePattern = lastPatternPart
+	if lastPart != "*" && lastPart != "**" {
+		namePattern = lastPart
 	}
 
 	// Find all files and then filter according to the name pattern
-	files := findAllFiles(baseStr, true)
-	filteredFiles := filterFiles(files, namePattern)
-	sort.Strings(filteredFiles)
-	return filteredFiles, nil
+	results := filterFiles(findAllFiles(baseStr), namePattern)
+	sort.Strings(results)
+	return results, nil
 }
 
-func findAllFiles(dir string, recurse bool) (files []string) {
+func findAllFiles(dir string) (files []string) {
 	walk.Walk(dir, &walk.Options{
 		Callback: func(path string, de *walk.Dirent) error {
 			if de.IsRegular() {
 				files = append(files, path)
-			} else if de.IsDir() && path != dir && !recurse {
-				return walk.SkipThis
 			}
 			return nil
 		},
@@ -148,12 +143,12 @@ func filterFiles(paths []string, namePattern string) (result []string) {
 
 	for _, path := range paths {
 		pathLen := len(path)
-		if path == "" || path[pathLen-1] == '/' {
+		if path == "" || path[pathLen-1] == filepath.Separator {
 			// Ignore empty paths and directories
 			continue
 		}
 		// Slice the filename part of the path
-		lastSlashIndex := strings.LastIndex(path, "/")
+		lastSlashIndex := strings.LastIndex(path, string(filepath.Separator))
 		name := path[lastSlashIndex+1 : pathLen]
 		// Match the filename according to one of the three pattern types
 		if checkFull {
