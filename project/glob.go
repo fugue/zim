@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	walk "github.com/karrick/godirwalk"
@@ -45,6 +46,7 @@ func Glob(pattern string) ([]string, error) {
 				results = append(results, match)
 			}
 		}
+		sort.Strings(results)
 		return results, nil
 	}
 
@@ -100,7 +102,9 @@ func Glob(pattern string) ([]string, error) {
 
 	// Find all files and then filter according to the name pattern
 	files := findAllFiles(baseStr, true)
-	return filterFiles(files, namePattern), nil
+	filteredFiles := filterFiles(files, namePattern)
+	sort.Strings(filteredFiles)
+	return filteredFiles, nil
 }
 
 func findAllFiles(dir string, recurse bool) (files []string) {
