@@ -14,14 +14,12 @@
 package project
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGlob(t *testing.T) {
@@ -47,7 +45,7 @@ func TestGlob(t *testing.T) {
 		{"src/widget/component.yaml", []string{expCompPath}},
 		{"src/*/*", []string{expCompPath, expMainPath}},
 		{"src/*/*.c", []string{}},
-		{"**", []string{expCompPath, expMainPath}},
+		{"**", []string{}},
 		{"**/*", []string{expCompPath, expMainPath}},
 		{"**/*.yaml", []string{expCompPath}},
 		{"**/*ml", []string{expCompPath}},
@@ -62,48 +60,7 @@ func TestGlob(t *testing.T) {
 	for _, tc := range tests {
 		pat := filepath.Join(dir, tc.pattern)
 		result, err := Glob(pat)
-		// fmt.Println(pat, result, err)
-		require.Nil(t, err)
-		require.Equal(t, tc.want, result)
-	}
-}
-
-func TestBadGlob(t *testing.T) {
-	type test struct {
-		input   string
-		wantErr error
-	}
-	tests := []test{
-		{"/foo/bar/*/**/foo", errors.New("Invalid pattern: /foo/bar/*/**/foo")},
-		{"/foo/*/bar/**/foo", errors.New("Invalid pattern: /foo/*/bar/**/foo")},
-		{"**/**/*.go", errors.New("Invalid pattern: **/**/*.go")},
-		{"**/foo/*.go", errors.New("Invalid pattern suffix: **/foo/*.go")},
-	}
-	for _, tc := range tests {
-		_, err := Glob(tc.input)
-		require.NotNil(t, err)
-		require.Equal(t, tc.wantErr, err)
-	}
-}
-
-func TestGlobFilterFiles(t *testing.T) {
-	type test struct {
-		paths   []string
-		pattern string
-		want    []string
-	}
-	tests := []test{
-		{[]string{"a/b/c.go", "b/c/d.txt"}, "*.go", []string{"a/b/c.go"}},
-		{[]string{"a/b/c.go", "b/c/d.txt"}, "*.txt", []string{"b/c/d.txt"}},
-		{[]string{"a/b/c.go", "b/c/d.txt"}, "*.txt", []string{"b/c/d.txt"}},
-		{[]string{"a/b/c.go", "b/c/d.txt"}, "d.txt", []string{"b/c/d.txt"}},
-		{[]string{"a/b/c.go", "b/c/d.txt"}, "missing", []string{}},
-		{[]string{"foo.c", "bar.abc"}, "*c", []string{"foo.c", "bar.abc"}},
-		{[]string{"cook.txt", "bar.abc"}, "c*", []string{"cook.txt"}},
-		{[]string{"a.blah.txt", "bar.abc"}, "a.blah.txt", []string{"a.blah.txt"}},
-	}
-	for _, tc := range tests {
-		result := filterFiles(tc.paths, tc.pattern)
+		assert.Nil(t, err)
 		assert.Equal(t, tc.want, result)
 	}
 }
