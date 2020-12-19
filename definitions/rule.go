@@ -144,7 +144,8 @@ func getMapWithStringKeys(m map[interface{}]interface{}) (map[string]interface{}
 }
 
 func mergeRule(a, b Rule) Rule {
-	return Rule{
+
+	result := Rule{
 		Inputs:      mergeStrings(a.Inputs, b.Inputs),
 		Outputs:     mergeStrings(a.Outputs, b.Outputs),
 		Ignore:      mergeStrings(a.Ignore, b.Ignore),
@@ -152,8 +153,6 @@ func mergeRule(a, b Rule) Rule {
 		Native:      mergeBool(a.Native, b.Native),
 		Requires:    mergeDependencies(a.Requires, b.Requires),
 		Description: mergeStr(a.Description, b.Description),
-		Command:     mergeStr(a.Command, b.Command),
-		Commands:    mergeCommands(a.Commands, b.Commands),
 		Providers: Providers{
 			Inputs:  mergeStr(a.Providers.Inputs, b.Providers.Inputs),
 			Outputs: mergeStr(a.Providers.Outputs, b.Providers.Outputs),
@@ -161,6 +160,27 @@ func mergeRule(a, b Rule) Rule {
 		When:   mergeConditions(a.When, b.When),
 		Unless: mergeConditions(a.Unless, b.Unless),
 	}
+
+	// Precedence for commands:
+	//  - Rule B over Rule A
+	//  - Commands over Command
+	if b.Commands != nil {
+		result.Commands = make([]interface{}, len(b.Commands))
+		for i, item := range b.Commands {
+			result.Commands[i] = item
+		}
+	} else if b.Command != "" {
+		result.Command = b.Command
+	} else if a.Commands != nil {
+		result.Commands = make([]interface{}, len(a.Commands))
+		for i, item := range a.Commands {
+			result.Commands[i] = item
+		}
+	} else {
+		result.Command = a.Command
+	}
+
+	return result
 }
 
 func mergeRules(a, b map[string]Rule) map[string]Rule {
