@@ -109,51 +109,6 @@ func (c *Component) Merge(other *Component) *Component {
 	return r
 }
 
-func mergeStr(a, b string) string {
-	if b != "" {
-		return b
-	}
-	return a
-}
-
-func mergeInt(a, b int) int {
-	if b != 0 {
-		return b
-	}
-	return a
-}
-
-func mergeBool(a, b bool) bool {
-	if b {
-		return true
-	}
-	return a
-}
-
-func copyStrings(input []string) []string {
-	if input == nil {
-		return nil
-	}
-	result := make([]string, len(input))
-	copy(result, input)
-	return result
-}
-
-func mergeStrings(a, b []string) []string {
-	if len(b) > 0 {
-		return copyStrings(b)
-	}
-	return copyStrings(a)
-}
-
-func copyStringsMap(m map[string]string) map[string]string {
-	result := map[string]string{}
-	for k, v := range m {
-		result[k] = v
-	}
-	return result
-}
-
 func copyExports(exports map[string]Export) map[string]Export {
 	result := map[string]Export{}
 	for k, export := range exports {
@@ -169,19 +124,22 @@ func copyExports(exports map[string]Export) map[string]Export {
 func mergeExports(a, b map[string]Export) map[string]Export {
 	result := copyExports(a)
 	for k, export := range b {
-		result[k] = Export{
-			Provider:  export.Provider,
-			Resources: copyStrings(export.Resources),
-			Ignore:    copyStrings(export.Ignore),
+		baseExport, existsInBase := result[k]
+		if !existsInBase {
+			// Added export
+			result[k] = Export{
+				Provider:  export.Provider,
+				Resources: copyStrings(export.Resources),
+				Ignore:    copyStrings(export.Ignore),
+			}
 		}
-	}
-	return result
-}
-
-func mergeStringsMap(a, b map[string]string) map[string]string {
-	result := copyStringsMap(a)
-	for k, v := range b {
-		result[k] = v
+		// Overriden export
+		finalExport := Export{
+			Provider:  mergeStr(baseExport.Provider, export.Provider),
+			Resources: mergeStrings(baseExport.Resources, export.Resources),
+			Ignore:    mergeStrings(baseExport.Ignore, export.Ignore),
+		}
+		result[k] = finalExport
 	}
 	return result
 }

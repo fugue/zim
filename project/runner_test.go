@@ -564,3 +564,35 @@ func TestRunnerBuiltIns(t *testing.T) {
 		}
 	}
 }
+
+func TestEmptyCommand(t *testing.T) {
+
+	dir := testDir()
+	defer os.RemoveAll(dir)
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	executor := NewMockExecutor(ctrl)
+	executor.EXPECT().UsesDocker().Return(false).AnyTimes()
+	executor.EXPECT().ExecutorPath(gomock.Any()).AnyTimes()
+	// Note: Execute is NOT called!
+
+	ctx := context.Background()
+	runner := &StandardRunner{}
+
+	testComponentFile(dir, "main.go", "package main")
+
+	p := &Project{rootAbs: dir}
+	c := &Component{name: "test-comp", componentDir: dir, project: p}
+	r := &Rule{
+		component: c,
+		name:      "test-rule",
+		local:     true,
+		// A run command with an empty argument should not be executed
+		commands: []*Command{&Command{Kind: "run", Argument: ""}},
+	}
+
+	code, err := runner.Run(ctx, r, RunOpts{Executor: executor})
+	require.Nil(t, err)
+	require.Equal(t, OK, code)
+}
