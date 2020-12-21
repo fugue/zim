@@ -17,6 +17,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"strings"
 )
 
@@ -29,8 +31,9 @@ type ConditionScript struct {
 
 // Condition controlling whether a Rule executes
 type Condition struct {
-	ResourceExists string
-	ScriptSucceeds ConditionScript
+	ResourceExists  string
+	DirectoryExists string
+	ScriptSucceeds  ConditionScript
 }
 
 // IsEmpty returns true if the Script is not defined
@@ -41,6 +44,9 @@ func (s ConditionScript) IsEmpty() bool {
 // IsEmpty returns true if the condition isn't configured
 func (c Condition) IsEmpty() bool {
 	if c.ResourceExists != "" {
+		return false
+	}
+	if c.DirectoryExists != "" {
 		return false
 	}
 	if !c.ScriptSucceeds.IsEmpty() {
@@ -105,6 +111,14 @@ func CheckCondition(
 			return false, err
 		}
 		return len(resources) > 0, nil
+	}
+
+	if c.DirectoryExists != "" {
+		dirPath := path.Join(r.Component().RelPath(), c.DirectoryExists)
+		if stat, err := os.Stat(dirPath); err == nil && stat.IsDir() {
+			return true, nil
+		}
+		return false, nil
 	}
 
 	if !c.ScriptSucceeds.IsEmpty() {
