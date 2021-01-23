@@ -217,7 +217,11 @@ func (runner *StandardRunner) execRunCommand(
 	execOpts ExecOpts,
 	cmd *Command,
 ) error {
-	execOpts.Command = cmd.Argument
+	script := strings.TrimSpace(cmd.Argument)
+	if script == "" {
+		return nil
+	}
+	execOpts.Command = script
 	return executor.Execute(ctx, execOpts)
 }
 
