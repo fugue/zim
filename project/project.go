@@ -209,13 +209,17 @@ func (p *Project) Select(names, kinds []string) (Components, error) {
 	return selected, nil
 }
 
-// Rule returns the specified Rule and a boolean indicating whether it was found
-func (p *Project) Rule(component, ruleName string) (*Rule, bool) {
-	rule := p.Components().WithName(component).Rule(ruleName).First()
-	if rule != nil {
-		return rule, true
+// Resolve the dependency, returning the Rule it references
+func (p *Project) Resolve(dep *Dependency) (*Rule, bool) {
+	component := p.Components().WithName(dep.Component).First()
+	if component == nil {
+		return nil, false
 	}
-	return nil, false
+	rule, found := component.Rule(dep.Rule, dep.Parameters)
+	if !found {
+		return nil, false
+	}
+	return rule, true
 }
 
 // Export returns the specified Export and a boolean indicating whether it was found

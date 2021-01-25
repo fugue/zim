@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"sort"
 
 	"github.com/fugue/zim/definitions"
 	"github.com/hashicorp/go-multierror"
@@ -57,6 +58,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		rules:        make(map[string]*Rule, len(self.Rules)),
 		exports:      make(map[string]*Export, len(self.Exports)),
 		env:          self.Environment,
+		def:          self,
 	}
 
 	for _, item := range self.Toolchain.Items {
@@ -83,13 +85,13 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		}
 	}
 
-	for name, ruleDef := range self.Rules {
-		rule, err := NewRule(name, &c, &ruleDef)
-		if err != nil {
-			return nil, err
-		}
-		c.rules[name] = rule
-	}
+	// for name, ruleDef := range self.Rules {
+	// 	rule, err := NewRule(name, &c, &ruleDef)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	c.rules[name] = rule
+	// }
 
 	return &c, nil
 }
@@ -123,6 +125,7 @@ type Component struct {
 	exports      map[string]*Export
 	env          map[string]string
 	toolchain    Toolchain
+	def          *definitions.Component
 }
 
 // Project returns the Project that contains this Component
@@ -179,16 +182,74 @@ func (c *Component) RelPaths(rs Resources) ([]string, error) {
 	return rs.RelativePaths(c.Directory())
 }
 
+// RuleName returns the rule name for the given rule configuration
+func (c *Component) RuleName(name string, parameters map[string]interface{}) string {
+	if len(parameters) == 0 {
+		return name
+	}
+	parameterNames := make([]string, 0, len(parameters))
+	for k := range parameters {
+		parameterNames = append(parameterNames, k)
+	}
+	sort.Strings(parameterNames)
+	result := name
+	for _, parameterName := range parameterNames {
+		result += fmt.Sprintf("%s=%v", parameterName, parameters[parameterName])
+	}
+	return result
+}
+
 // Rule returns the Component rule with the given name, if it exists,
 // along with a boolean that indicates whether it was found
-func (c *Component) Rule(name string) (r *Rule, found bool) {
-	r, found = c.rules[name]
-	return
+func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (*Rule, bool) {
+
+	// Retrieve the rule definition with that name
+	ruleDef, found := c.def.Rules[name]
+	fmt.Println("Rule", ruleDef, found)
+	if !found {
+		return nil, false
+	}
+
+	var parameters map[string]interface{}
+	if len(optParameters) > 0 {
+		parameters = optParameters[0]
+	}
+
+	// Resolve rule parameter values
+	values := map[string]interface{}{}
+
+	for pName, param := range ruleDef.Parameters {
+		value, ok := parameters[pName]
+		if ok {
+			values[pName] = value
+		} else {
+			values[pName] = param.Default
+		}
+	}
+
+	// Determine rule name which includes its parameters
+	fullName := c.RuleName(name, values)
+	rule, found := c.rules[fullName]
+	if found {
+		return rule, true
+	}
+	rule, err := NewRule(name, values, c, &ruleDef)
+	if err != nil {
+		return nil, false
+	}
+
+	if err := rule.resolveDeps(); err != nil {
+		fmt.Println("resolveDeps ERROR", err)
+		return nil, false
+	}
+
+	c.rules[fullName] = rule
+	return rule, true
 }
 
 // MustRule returns the named rule or panics if it is not found
 func (c *Component) MustRule(name string) *Rule {
-	r, found := c.rules[name]
+	r, found := c.Rule(name)
 	if !found {
 		panic(fmt.Sprintf("Component %s has no rule %s", c.Name(), name))
 	}
@@ -229,7 +290,8 @@ func (c *Component) Exports() []*Export {
 // Unknown names are just ignored.
 func (c *Component) Select(names []string) (result []*Rule) {
 	for _, name := range names {
-		if r, exists := c.Rule(name); exists {
+		if c.HasRule(name) {
+			r, _ := c.Rule(name, nil)
 			result = append(result, r)
 		}
 	}

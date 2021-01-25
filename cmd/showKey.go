@@ -83,7 +83,7 @@ func NewShowKeyCommand() *cobra.Command {
 			if c == nil {
 				fatal(fmt.Errorf("Unknown component: %s", componentName))
 			}
-			r, found := c.Rule(ruleName)
+			r, found := c.Rule(ruleName, nil)
 			if !found {
 				fatal(fmt.Errorf("Unknown rule: %s.%s", componentName, ruleName))
 			}

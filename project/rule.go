@@ -23,10 +23,11 @@ import (
 
 // Dependency on another Component (a Rule or an Export)
 type Dependency struct {
-	Component string
-	Rule      string
-	Export    string
-	Recurse   int
+	Component  string
+	Rule       string
+	Export     string
+	Parameters map[string]interface{}
+	Recurse    int
 }
 
 // Command to be run by a Rule
@@ -62,6 +63,14 @@ func NewCommands(self *definitions.Rule) (result []*Command, err error) {
 	return
 }
 
+// Parameter is used to configure a Rule
+type Parameter struct {
+	Name        string
+	Description string
+	Type        string
+	Default     interface{}
+}
+
 // Rule is an operation on a Component
 type Rule struct {
 	component       *Component
@@ -80,10 +89,16 @@ type Rule struct {
 	outProvider     Provider
 	when            Condition
 	unless          Condition
+	parameters      map[string]interface{}
 }
 
 // NewRule constructs a Rule from a provided YAML definition
-func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
+func NewRule(
+	name string,
+	parameters map[string]interface{},
+	c *Component,
+	self *definitions.Rule,
+) (*Rule, error) {
 
 	commands, err := NewCommands(self)
 	if err != nil {
@@ -101,15 +116,21 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 		outputs:     self.Outputs,
 		commands:    commands,
 		requires:    make([]*Dependency, 0, len(self.Requires)),
+		parameters:  parameters,
 	}
 
 	for _, dep := range self.Requires {
-		r.requires = append(r.requires, &Dependency{
-			Component: dep.Component,
-			Rule:      dep.Rule,
-			Export:    dep.Export,
-			Recurse:   dep.Recurse,
-		})
+		ruleDep := &Dependency{
+			Component:  dep.Component,
+			Rule:       dep.Rule,
+			Export:     dep.Export,
+			Recurse:    dep.Recurse,
+			Parameters: dep.Parameters,
+		}
+		if ruleDep.Component == "" {
+			ruleDep.Component = c.Name()
+		}
+		r.requires = append(r.requires, ruleDep)
 	}
 
 	r.inProvider, err = c.Provider(self.Providers.Inputs)
@@ -167,6 +188,9 @@ func (r *Rule) resolveDeps() error {
 		}
 		// Otherwise, this dependency is on the output of another Rule
 		depRule, err := r.resolveDep(dep)
+
+		fmt.Println("resolveDeps", r.NodeID(), dep.Component, dep.Rule, err)
+
 		if err != nil {
 			return err
 		}
@@ -214,18 +238,10 @@ func (r *Rule) resolveExport(dep *Dependency) (*Export, error) {
 // If the Dependency component name is blank, the component is assumed
 // to be the one containing this Rule.
 func (r *Rule) resolveDep(dep *Dependency) (*Rule, error) {
-
-	var depCompName string
-	if dep.Component == "" {
-		depCompName = r.Component().Name()
-	} else {
-		depCompName = dep.Component
-	}
-
-	depRule, found := r.Component().Project().Rule(depCompName, dep.Rule)
+	depRule, found := r.Component().Project().Resolve(dep)
 	if !found {
 		return nil, fmt.Errorf("Invalid dep - rule not found: %s.%s",
-			depCompName, dep.Rule)
+			dep.Component, dep.Rule)
 	}
 	return depRule, nil
 }

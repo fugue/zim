@@ -85,15 +85,15 @@ func (comps Components) Rules(names []string) Rules {
 
 // Rule returns a slice of all Rules with the given name across all
 // these Components
-func (comps Components) Rule(name string) Rules {
-	rules := make(Rules, 0, len(comps))
-	for _, c := range comps {
-		if rule, found := c.Rule(name); found {
-			rules = append(rules, rule)
-		}
-	}
-	return rules
-}
+// func (comps Components) Rule(name string) Rules {
+// 	rules := make(Rules, 0, len(comps))
+// 	for _, c := range comps {
+// 		if rule, found := c.Rule(name); found {
+// 			rules = append(rules, rule)
+// 		}
+// 	}
+// 	return rules
+// }
 
 // First rule in the list, or nil if the list is empty
 func (rules Rules) First() *Rule {

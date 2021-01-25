@@ -19,10 +19,11 @@ import (
 
 // Dependency between Rules
 type Dependency struct {
-	Component string `yaml:"component"`
-	Rule      string `yaml:"rule"`
-	Export    string `yaml:"export"`
-	Recurse   int    `yaml:"recurse"`
+	Component  string                 `yaml:"component"`
+	Rule       string                 `yaml:"rule"`
+	Export     string                 `yaml:"export"`
+	Parameters map[string]interface{} `yaml:"parameters"`
+	Recurse    int                    `yaml:"recurse"`
 }
 
 // Providers specifies the name of the Provider type to be used for the
@@ -53,19 +54,20 @@ type Condition struct {
 
 // Rule defines inputs, commands, and outputs for a build step or action
 type Rule struct {
-	Name        string        `yaml:"name"`
-	Inputs      []string      `yaml:"inputs"`
-	Outputs     []string      `yaml:"outputs"`
-	Ignore      []string      `yaml:"ignore"`
-	Local       bool          `yaml:"local"`
-	Native      bool          `yaml:"native"`
-	Requires    []Dependency  `yaml:"requires"`
-	Description string        `yaml:"description"`
-	Command     string        `yaml:"command"`
-	Commands    []interface{} `yaml:"commands"`
-	Providers   Providers     `yaml:"providers"`
-	When        Condition     `yaml:"when"`
-	Unless      Condition     `yaml:"unless"`
+	Name        string               `yaml:"name"`
+	Inputs      []string             `yaml:"inputs"`
+	Outputs     []string             `yaml:"outputs"`
+	Ignore      []string             `yaml:"ignore"`
+	Local       bool                 `yaml:"local"`
+	Native      bool                 `yaml:"native"`
+	Requires    []Dependency         `yaml:"requires"`
+	Description string               `yaml:"description"`
+	Command     string               `yaml:"command"`
+	Commands    []interface{}        `yaml:"commands"`
+	Providers   Providers            `yaml:"providers"`
+	When        Condition            `yaml:"when"`
+	Unless      Condition            `yaml:"unless"`
+	Parameters  map[string]Parameter `yaml:"parameter"`
 }
 
 // GetCommands returns commands unmarshaled from the rule's semi-structured YAML
@@ -158,8 +160,9 @@ func mergeRule(a, b Rule) Rule {
 			Inputs:  mergeStr(a.Providers.Inputs, b.Providers.Inputs),
 			Outputs: mergeStr(a.Providers.Outputs, b.Providers.Outputs),
 		},
-		When:   mergeConditions(a.When, b.When),
-		Unless: mergeConditions(a.Unless, b.Unless),
+		When:       mergeConditions(a.When, b.When),
+		Unless:     mergeConditions(a.Unless, b.Unless),
+		Parameters: mergeParameters(a.Parameters, b.Parameters),
 	}
 
 	// Precedence for commands:
