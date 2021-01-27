@@ -197,7 +197,6 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 
 	// Retrieve the rule definition with that name
 	ruleDef, found := c.def.Rules[name]
-	fmt.Println("Rule", ruleDef, found)
 	if !found {
 		return nil, false
 	}
@@ -212,6 +211,7 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 
 	for pName, param := range ruleDef.Parameters {
 		value, ok := parameters[pName]
+		// TODO: type checking
 		if ok {
 			values[pName] = value
 		} else {
@@ -219,19 +219,20 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 		}
 	}
 
+	// TODO: potentially raise error if an unsupported parameter is passed.
+
 	// Determine rule name which includes its parameters
-	fullName := c.RuleName(name, values)
+	fullName := RuleName(name, values)
 	rule, found := c.rules[fullName]
 	if found {
 		return rule, true
 	}
-	rule, err := NewRule(name, values, c, &ruleDef)
+	rule, err := NewRule(name, fullName, values, c, &ruleDef)
 	if err != nil {
 		return nil, false
 	}
 
 	if err := rule.resolveDeps(); err != nil {
-		fmt.Println("resolveDeps ERROR", err)
 		return nil, false
 	}
 

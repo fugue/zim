@@ -16,6 +16,7 @@ package project
 import (
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/fugue/zim/definitions"
@@ -23,11 +24,12 @@ import (
 
 // Dependency on another Component (a Rule or an Export)
 type Dependency struct {
-	Component  string
-	Rule       string
-	Export     string
-	Parameters map[string]interface{}
-	Recurse    int
+	Component    string
+	Rule         string
+	Export       string
+	Parameters   map[string]interface{}
+	Recurse      int
+	ResolvedRule *Rule
 }
 
 // Command to be run by a Rule
@@ -73,28 +75,30 @@ type Parameter struct {
 
 // Rule is an operation on a Component
 type Rule struct {
-	component       *Component
-	name            string
-	local           bool
-	native          bool
-	inputs          []string
-	ignore          []string
-	requires        []*Dependency
-	outputs         []string
-	description     string
-	commands        []*Command
-	resolvedDeps    []*Rule
-	resolvedImports []*Export
-	inProvider      Provider
-	outProvider     Provider
-	when            Condition
-	unless          Condition
-	parameters      map[string]interface{}
+	component         *Component
+	name              string
+	parameterizedName string
+	local             bool
+	native            bool
+	inputs            []string
+	ignore            []string
+	requires          []*Dependency
+	outputs           []string
+	description       string
+	commands          []*Command
+	resolvedDeps      []*Rule
+	resolvedImports   []*Export
+	inProvider        Provider
+	outProvider       Provider
+	when              Condition
+	unless            Condition
+	parameters        map[string]interface{}
 }
 
 // NewRule constructs a Rule from a provided YAML definition
 func NewRule(
 	name string,
+	parameterizedName string,
 	parameters map[string]interface{},
 	c *Component,
 	self *definitions.Rule,
@@ -106,17 +110,18 @@ func NewRule(
 	}
 
 	r := &Rule{
-		component:   c,
-		name:        name,
-		description: self.Description,
-		local:       self.Local,
-		native:      self.Native,
-		inputs:      self.Inputs,
-		ignore:      self.Ignore,
-		outputs:     self.Outputs,
-		commands:    commands,
-		requires:    make([]*Dependency, 0, len(self.Requires)),
-		parameters:  parameters,
+		component:         c,
+		name:              name,
+		parameterizedName: parameterizedName,
+		description:       self.Description,
+		local:             self.Local,
+		native:            self.Native,
+		inputs:            self.Inputs,
+		ignore:            self.Ignore,
+		outputs:           self.Outputs,
+		commands:          commands,
+		requires:          make([]*Dependency, 0, len(self.Requires)),
+		parameters:        parameters,
 	}
 
 	for _, dep := range self.Requires {
@@ -188,30 +193,10 @@ func (r *Rule) resolveDeps() error {
 		}
 		// Otherwise, this dependency is on the output of another Rule
 		depRule, err := r.resolveDep(dep)
-
-		fmt.Println("resolveDeps", r.NodeID(), dep.Component, dep.Rule, err)
-
 		if err != nil {
 			return err
 		}
 		r.resolvedDeps = append(r.resolvedDeps, depRule)
-		// Currently it is allowed to pull in transitive dependencies that
-		// are one step removed as dependencies of this Rule, if desired.
-		// This can be helpful when the immediate dependency doesn't actually
-		// fully encapsulate its own dependencies outputs.
-		if dep.Recurse > 1 {
-			return fmt.Errorf("Invalid dep - recursion: %s.%s",
-				dep.Component, dep.Rule)
-		} else if dep.Recurse == 1 {
-			// Pull in transitive dependencies that are one step removed
-			for _, rDep := range depRule.requires {
-				rDepRule, err := r.resolveDep(rDep)
-				if err != nil {
-					return err
-				}
-				r.resolvedDeps = append(r.resolvedDeps, rDepRule)
-			}
-		}
 	}
 	return nil
 }
@@ -243,19 +228,24 @@ func (r *Rule) resolveDep(dep *Dependency) (*Rule, error) {
 		return nil, fmt.Errorf("Invalid dep - rule not found: %s.%s",
 			dep.Component, dep.Rule)
 	}
+	dep.ResolvedRule = depRule
 	return depRule, nil
 }
 
 // BaseEnvironment returns Rule environment variables that are known upfront
 func (r *Rule) BaseEnvironment() map[string]string {
 	c := r.Component()
-	return combineEnvironment(c.Environment(), map[string]string{
+	env := combineEnvironment(c.Environment(), map[string]string{
 		"COMPONENT": c.Name(),
 		"NAME":      c.Name(),
 		"KIND":      c.Kind(),
 		"RULE":      r.Name(),
 		"NODE_ID":   r.NodeID(),
 	})
+	for k, v := range r.parameters {
+		env[k] = fmt.Sprintf("%v", v)
+	}
+	return env
 }
 
 // Environment returns variables to be used when executing this Rule
@@ -323,7 +313,11 @@ func (r *Rule) Name() string {
 
 // NodeID makes Rules adhere to the graph.Node interface
 func (r *Rule) NodeID() string {
-	return fmt.Sprintf("%s.%s", r.Component().Name(), r.Name())
+	ruleName := r.parameterizedName
+	if ruleName == "" {
+		ruleName = r.name
+	}
+	return fmt.Sprintf("%s.%s", r.Component().Name(), ruleName)
 }
 
 // Image returns the Docker image used to build this Rule, if configured
@@ -466,4 +460,21 @@ func matchResources(c *Component, p Provider, patterns []string) (result Resourc
 		result = append(result, matches...)
 	}
 	return
+}
+
+// RuleName returns the rule name for the given rule configuration
+func RuleName(name string, parameters map[string]interface{}) string {
+	if len(parameters) == 0 {
+		return name
+	}
+	parameterNames := make([]string, 0, len(parameters))
+	for k := range parameters {
+		parameterNames = append(parameterNames, k)
+	}
+	sort.Strings(parameterNames)
+	result := name
+	for _, parameterName := range parameterNames {
+		result += fmt.Sprintf(" [%s=%v]", parameterName, parameters[parameterName])
+	}
+	return result
 }

@@ -67,7 +67,7 @@ type Rule struct {
 	Providers   Providers            `yaml:"providers"`
 	When        Condition            `yaml:"when"`
 	Unless      Condition            `yaml:"unless"`
-	Parameters  map[string]Parameter `yaml:"parameter"`
+	Parameters  map[string]Parameter `yaml:"parameters"`
 }
 
 // GetCommands returns commands unmarshaled from the rule's semi-structured YAML
