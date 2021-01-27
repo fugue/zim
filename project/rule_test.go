@@ -171,9 +171,14 @@ func TestRuleMissingDepOutputs(t *testing.T) {
 		"main.go": testGoMain,
 	})
 
-	_, err := New(dir)
-	require.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Invalid dep - rule not found: foo.build")
+	p, err := New(dir)
+	require.Nil(t, err)
+
+	c := p.Components().WithName("bar").First()
+	require.NotNil(t, c)
+
+	_, found := c.Rule("build")
+	require.False(t, found)
 }
 
 func TestRuleOutputs(t *testing.T) {

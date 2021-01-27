@@ -57,9 +57,6 @@ func TestNewComponent(t *testing.T) {
 	if len(c.Rules()) != 0 {
 		t.Error("Expected empty rule names")
 	}
-	if c.HasRule("HUH?") {
-		t.Error("Expected rule not to be found")
-	}
 	if _, ruleFound := c.Rule("WHUT"); ruleFound {
 		t.Error("Expected rule not to be found")
 	}
@@ -80,9 +77,6 @@ func TestNewComponentEmptyRule(t *testing.T) {
 	c, _ := NewComponent(p, self)
 	if c == nil {
 		t.Fatal("Expected a Component to be returned; got nil")
-	}
-	if !c.HasRule("build") {
-		t.Fatal("Expected build rule to exist")
 	}
 	rule, found := c.Rule("build")
 	if !found {

@@ -85,14 +85,6 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 		}
 	}
 
-	// for name, ruleDef := range self.Rules {
-	// 	rule, err := NewRule(name, &c, &ruleDef)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	c.rules[name] = rule
-	// }
-
 	return &c, nil
 }
 
@@ -265,12 +257,6 @@ func (c *Component) Rules() []*Rule {
 	return rules
 }
 
-// HasRule returns true if a Rule with the given name is defined
-func (c *Component) HasRule(name string) bool {
-	_, found := c.rules[name]
-	return found
-}
-
 // Export returns the Component export with the given name, if it exists
 func (c *Component) Export(name string) (e *Export, found bool) {
 	e, found = c.exports[name]
@@ -290,7 +276,7 @@ func (c *Component) Exports() []*Export {
 // Unknown names are just ignored.
 func (c *Component) Select(names []string) (result []*Rule) {
 	for _, name := range names {
-		if c.HasRule(name) {
+		if _, found := c.def.Rules[name]; found {
 			r, _ := c.Rule(name, nil)
 			result = append(result, r)
 		}
