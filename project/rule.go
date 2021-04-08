@@ -474,7 +474,7 @@ func RuleName(name string, parameters map[string]interface{}) string {
 	sort.Strings(parameterNames)
 	result := name
 	for _, parameterName := range parameterNames {
-		result += fmt.Sprintf(" [%s=%v]", parameterName, parameters[parameterName])
+		result += fmt.Sprintf(" %s=%v", parameterName, parameters[parameterName])
 	}
 	return result
 }

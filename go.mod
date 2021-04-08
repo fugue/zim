@@ -17,6 +17,7 @@ require (
 	github.com/docker/docker v1.13.1
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/drone/envsubst v1.0.2
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-yaml/yaml v2.1.0+incompatible

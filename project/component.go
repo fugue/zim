@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/envsub"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -214,15 +215,28 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 		// TODO: type checking
 		if ok {
 			values[pName] = value
-		} else {
+		} else { // TODO: handle required parameters
 			values[pName] = param.Default
 		}
 	}
 
-	// TODO: potentially raise error if an unsupported parameter is passed.
+	state := map[string]interface{}{
+		"COMPONENT": c.Name(),
+		"NAME":      c.Name(),
+		"KIND":      c.Kind(),
+		"RULE":      name,
+	}
+	builtIns := []string{"COMPONENT", "NAME", "KIND", "RULE"}
 
-	// Determine rule name which includes its parameters
-	fullName := RuleName(name, values)
+	if err := envsub.Eval(state, values); err != nil {
+		return nil, false
+	}
+	for _, name := range builtIns {
+		delete(state, name)
+	}
+
+	// Determine rule name including its parameters
+	fullName := RuleName(name, state)
 	rule, found := c.rules[fullName]
 	if found {
 		return rule, true
@@ -231,11 +245,9 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 	if err != nil {
 		return nil, false
 	}
-
 	if err := rule.resolveDeps(); err != nil {
 		return nil, false
 	}
-
 	c.rules[fullName] = rule
 	return rule, true
 }
