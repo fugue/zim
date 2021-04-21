@@ -14,6 +14,9 @@
 package graph
 
 import (
+	"bytes"
+	"strings"
+
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 	"gonum.org/v1/gonum/graph/topo"
@@ -198,4 +201,30 @@ func nodesFromIterator(iter graph.Nodes) []Node {
 		nodes = append(nodes, iter.Node().(*simpleNode).unwrap())
 	}
 	return nodes
+}
+
+func (g *Graph) Marshal() ([]byte, error) {
+	var buf bytes.Buffer
+	ids := make(map[int64]string)
+
+	buf.WriteString("strict digraph {\n// Node definitions.\n")
+
+	for k, v := range g.wrapped {
+		key := strings.Replace(k, ".", "_", -1)
+		buf.WriteString(key + ";\n")
+		ids[v.id] = key
+	}
+	buf.WriteString("// Edge definitions.\n")
+
+	edges := g.graph.Edges()
+	for edges.Next() {
+		f := edges.Edge().From().ID()
+		t := edges.Edge().To().ID()
+
+		buf.WriteString(ids[f] + " -> " + ids[t] + ";\n")
+	}
+
+	buf.WriteString("}\n")
+
+	return buf.Bytes(), nil
 }
