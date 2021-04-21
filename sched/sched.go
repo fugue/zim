@@ -16,7 +16,6 @@ package sched
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sort"
 	"sync"
@@ -62,18 +61,10 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 	// their transitive dependencies
 	schedGraph := project.GraphFromRules(opts.Rules)
 
-	// TODO
-	// content, err := dot.Marshal(schedGraph.Graph, "", "", "\t")
-	// if err != nil {
-	// 	log.Fatal("Could not marshall: ", err)
-	// }
-	content, err := schedGraph.Marshal()
-	if err != nil {
-		log.Fatal("Could not marshall: ", err)
-	}
-
+	// TODO: Change this
+	content := schedGraph.GenerateDOT()
 	fmt.Println(string(content))
-	os.Exit(100)
+	os.Exit(-1)
 
 	executor := opts.Executor
 	if executor == nil {
