@@ -35,4 +35,5 @@ type Scheduler interface {
 
 	// Run specified Rules
 	Run(context.Context, Options) error
+	DOT(context.Context, Options) []byte
 }

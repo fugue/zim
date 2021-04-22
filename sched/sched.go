@@ -16,7 +16,6 @@ package sched
 import (
 	"context"
 	"fmt"
-	"os"
 	"sort"
 	"sync"
 	"time"
@@ -60,11 +59,6 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 	// Create a dependency graph which includes the chosen rules and all
 	// their transitive dependencies
 	schedGraph := project.GraphFromRules(opts.Rules)
-
-	// TODO: Change this
-	content := schedGraph.GenerateDOT()
-	fmt.Println(string(content))
-	os.Exit(-1)
 
 	executor := opts.Executor
 	if executor == nil {
@@ -189,6 +183,16 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 	}
 
 	return errors.ErrorOrNil()
+}
+
+func (s *dagScheduler) DOT(ctx context.Context, opts Options) []byte {
+
+	// Create a dependency graph which includes the chosen rules and all
+	// their transitive dependencies
+	schedGraph := project.GraphFromRules(opts.Rules)
+
+	content := schedGraph.GenerateDOT()
+	return content
 }
 
 func nodesToRules(nodes []graph.Node) (result []*project.Rule) {

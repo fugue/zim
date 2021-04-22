@@ -98,7 +98,7 @@ func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 	}
 
 	// Rules can be specified by arguments or options for run
-	if cmd.Name() == "run" && len(opts.Rules) == 0 && len(args) > 0 {
+	if (cmd.Name() == "run" || cmd.Name() == "dot") && len(opts.Rules) == 0 && len(args) > 0 {
 		opts.Rules = args
 	}
 

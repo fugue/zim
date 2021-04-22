@@ -206,12 +206,12 @@ func nodesFromIterator(iter graph.Nodes) []Node {
 func (g *Graph) GenerateDOT() []byte {
 	var buf bytes.Buffer
 
-	buf.WriteString("strict digraph {\n\t// Node definitions.\n")
+	buf.WriteString("strict digraph {\n\n\t// Node definitions.\n")
 	for k, v := range g.wrapped {
-		buf.WriteString("\t" + fmt.Sprint(v.id) + " [label=\"" + k + "\"];\n")
+		buf.WriteString("\t" + fmt.Sprint(v.id) + "\t[label=\"" + k + "\"];\n")
 	}
 
-	buf.WriteString("\t// Edge definitions.\n")
+	buf.WriteString("\n\t// Edge definitions.\n")
 	edges := g.graph.Edges()
 	for edges.Next() {
 		f := edges.Edge().From().ID()
