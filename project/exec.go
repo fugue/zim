@@ -70,10 +70,6 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 
 	environment := append(os.Environ(), opts.Env...)
 
-	// Replace newlines with semicolons if the command is multiline
-	commands := strings.Split(strings.TrimSpace(opts.Command), "\n")
-	commandText := strings.Join(commands, "; ")
-
 	workingDir := opts.WorkingDirectory
 	if workingDir == "" {
 		workingDir = "."
@@ -84,13 +80,23 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	if opts.Debug {
 		args = extendSlice(args, "-x")
 	}
-	args = extendSlice(args, "-c", commandText)
 
 	bashCmd := exec.CommandContext(ctx, "bash", args...)
 	bashCmd.Env = environment
 	bashCmd.Dir = workingDir
 	bashCmd.Stdout = getWriter(opts.Stdout, os.Stdout)
 	bashCmd.Stderr = getWriter(opts.Stderr, os.Stderr)
+
+	stdin, err := bashCmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	// Write command to the process' stdin.
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, opts.Command)
+	}()
 
 	// Show the command to be executed to the user
 	cmdOut := getWriter(opts.Cmdout, os.Stdout)
@@ -99,7 +105,7 @@ func (e *bashExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		fmt.Fprintln(cmdOut, "dbg:", debugColor(strings.Join(bashCmd.Args, " ")))
 	}
 	cmdColor := color.New(color.FgMagenta).SprintFunc()
-	fmt.Fprintln(cmdOut, "cmd:", cmdColor(commandText))
+	fmt.Fprintln(cmdOut, "cmd:", cmdColor(opts.Command))
 
 	return bashCmd.Run()
 }

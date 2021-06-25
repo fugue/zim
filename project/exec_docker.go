@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/user"
@@ -79,14 +80,10 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		return fmt.Errorf("Failed to get relative dir: %s", err)
 	}
 
-	// Replace newlines with semicolons if the command is multiline
-	commands := strings.Split(strings.TrimSpace(opts.Command), "\n")
-	commandText := strings.Join(commands, "; ")
-
 	args := []string{
 		"run",
+		"-i",
 		"--rm",
-		"-t",
 		"--volume",
 		fmt.Sprintf("%s:%s", mountDir, e.ExecDirectory),
 		"--workdir",
@@ -119,11 +116,21 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	if opts.Debug {
 		args = extendSlice(args, "-x")
 	}
-	args = extendSlice(args, "-c", commandText)
 
 	dockerCmd := exec.CommandContext(ctx, "docker", args...)
 	dockerCmd.Stdout = getWriter(opts.Stdout, os.Stdout)
 	dockerCmd.Stderr = getWriter(opts.Stderr, os.Stderr)
+
+	stdin, err := dockerCmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+
+	// Write command to the process' stdin.
+	go func() {
+		defer stdin.Close()
+		io.WriteString(stdin, opts.Command)
+	}()
 
 	// Show the command to be executed to the user
 	cmdOut := getWriter(opts.Cmdout, os.Stdout)
@@ -132,7 +139,7 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 		fmt.Fprintln(cmdOut, "dbg:", debugColor(strings.Join(dockerCmd.Args, " ")))
 	}
 	cmdColor := color.New(color.FgCyan).SprintFunc()
-	fmt.Fprintln(cmdOut, "cmd:", cmdColor(commandText))
+	fmt.Fprintln(cmdOut, "cmd:", cmdColor(opts.Command))
 
 	// Notice if the context was canceled and call "docker rm" on the
 	// container since it continues to run otherwise. Better way possible?
