@@ -114,7 +114,7 @@ func CheckCondition(
 	}
 
 	if c.DirectoryExists != "" {
-		dirPath := path.Join(r.Component().RelPath(), c.DirectoryExists)
+		dirPath := path.Join(r.Component().Directory(), c.DirectoryExists)
 		if stat, err := os.Stat(dirPath); err == nil && stat.IsDir() {
 			return true, nil
 		}

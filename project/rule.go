@@ -126,7 +126,8 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 	r.ignore = substituteVarsSlice(r.ignore, variables)
 	r.outputs = substituteVarsSlice(r.outputs, variables)
 	r.when = Condition{
-		ResourceExists: substituteVars(self.When.ResourceExists, variables),
+		ResourceExists:  substituteVars(self.When.ResourceExists, variables),
+		DirectoryExists: substituteVars(self.When.DirectoryExists, variables),
 		ScriptSucceeds: ConditionScript{
 			Run:           substituteVars(self.When.ScriptSucceeds.Run, variables),
 			WithOutput:    substituteVars(self.When.ScriptSucceeds.WithOutput, variables),
@@ -134,7 +135,8 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 		},
 	}
 	r.unless = Condition{
-		ResourceExists: substituteVars(self.Unless.ResourceExists, variables),
+		ResourceExists:  substituteVars(self.Unless.ResourceExists, variables),
+		DirectoryExists: substituteVars(self.Unless.DirectoryExists, variables),
 		ScriptSucceeds: ConditionScript{
 			Run:           substituteVars(self.Unless.ScriptSucceeds.Run, variables),
 			WithOutput:    substituteVars(self.Unless.ScriptSucceeds.WithOutput, variables),

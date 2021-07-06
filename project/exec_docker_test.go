@@ -1,4 +1,4 @@
-// +build docker-test
+// +build dockertest
 
 package project
 

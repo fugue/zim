@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -158,6 +159,80 @@ func TestConditionScript(t *testing.T) {
 			DebugOutput: &stdout,
 			Debug:       false,
 		}
+		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor)
+		if conditionsMet != tc.want {
+			t.Errorf("expected: %v, got: %v", tc.want, conditionsMet)
+		}
+		if errStringOrEmpty(err) != errStringOrEmpty(tc.wantErr) {
+			t.Errorf("expected: %v, got: %v", tc.wantErr, err)
+		}
+	}
+}
+
+func TestExistsConditions(t *testing.T) {
+
+	root := testDir()
+	defer os.RemoveAll(root)
+
+	// Create test directories and files as follows:
+	//  <root>/src/my-component
+	//  <root>/src/my-component/test.txt
+	//  <root>/src/my-component/<random-subdirectory>
+	componentDir, _ := testComponentDir(root, "my-component")
+	testComponentFile(componentDir, "test.txt", "some contents here")
+	subDir := path.Base(testDir(componentDir))
+
+	ctx := context.Background()
+	executor := NewBashExecutor()
+
+	fs, err := NewFileSystem(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Component{
+		name:         "my-component",
+		componentDir: componentDir,
+		relPath:      path.Join("src", "my-component"),
+	}
+	r := &Rule{
+		component:  c,
+		name:       "test-rule",
+		inProvider: fs,
+	}
+
+	type test struct {
+		input   Condition
+		want    bool
+		wantErr error
+	}
+
+	tests := []test{
+		{
+			input:   Condition{DirectoryExists: subDir},
+			want:    true,
+			wantErr: nil,
+		},
+		{
+			input:   Condition{DirectoryExists: "MISSING"},
+			want:    false,
+			wantErr: nil,
+		},
+		{
+			input:   Condition{ResourceExists: "test.txt"},
+			want:    true,
+			wantErr: nil,
+		},
+		{
+			input:   Condition{ResourceExists: "MISSING"},
+			want:    false,
+			wantErr: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		var stdout bytes.Buffer
+		runOpts := RunOpts{Output: &stdout, DebugOutput: &stdout, Debug: false}
 		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor)
 		if conditionsMet != tc.want {
 			t.Errorf("expected: %v, got: %v", tc.want, conditionsMet)
