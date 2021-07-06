@@ -46,8 +46,9 @@ func (s ConditionScript) IsEmpty() bool {
 
 // Condition that controls rule or command execution
 type Condition struct {
-	ResourceExists string          `yaml:"resource_exists"`
-	ScriptSucceeds ConditionScript `yaml:"script_succeeds"`
+	ResourceExists  string          `yaml:"resource_exists"`
+	DirectoryExists string          `yaml:"directory_exists"`
+	ScriptSucceeds  ConditionScript `yaml:"script_succeeds"`
 }
 
 // Rule defines inputs, commands, and outputs for a build step or action
@@ -230,9 +231,13 @@ func mergeCommands(a, b []interface{}) (result []interface{}) {
 
 func mergeConditions(a, b Condition) (result Condition) {
 	result.ResourceExists = a.ResourceExists
+	result.DirectoryExists = a.DirectoryExists
 	result.ScriptSucceeds = a.ScriptSucceeds
 	if b.ResourceExists != "" {
 		result.ResourceExists = b.ResourceExists
+	}
+	if b.DirectoryExists != "" {
+		result.DirectoryExists = b.DirectoryExists
 	}
 	if !b.ScriptSucceeds.IsEmpty() {
 		result.ScriptSucceeds = b.ScriptSucceeds
