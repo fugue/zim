@@ -64,7 +64,6 @@ func (fs *FileSystem) Match(pattern string) (Resources, error) {
 		return Resources{fs.New(match)}, nil
 	}
 	matches, err := MatchFiles(fs.root, pattern)
-
 	if err != nil {
 		return nil, fmt.Errorf("Failed to match resources %s: %s", pattern, err)
 	}
