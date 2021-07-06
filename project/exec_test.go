@@ -49,3 +49,22 @@ func TestBashExecutor(t *testing.T) {
 		t.Error("Unexpected output:", out)
 	}
 }
+
+func TestBashExecutorMultiline(t *testing.T) {
+	dir := testDir()
+	ctx := context.Background()
+	e := NewBashExecutor()
+
+	var stdout bytes.Buffer
+
+	err := e.Execute(ctx, ExecOpts{
+		Command: `
+echo foo
+# This is a comment
+echo bar`,
+		WorkingDirectory: dir,
+		Stdout:           &stdout,
+	})
+	require.Nil(t, err)
+	require.Equal(t, "foo\nbar\n", stdout.String())
+}
