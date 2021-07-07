@@ -63,11 +63,12 @@ func CheckConditions(
 	r *Rule,
 	opts RunOpts,
 	executor Executor,
+	env map[string]string,
 ) (bool, error) {
 
 	if !r.when.IsEmpty() {
 		// A when condition is defined
-		whenCondition, err := CheckCondition(ctx, r, r.when, opts, executor)
+		whenCondition, err := CheckCondition(ctx, r, r.when, opts, executor, env)
 		if err != nil {
 			return false, err
 		}
@@ -79,7 +80,7 @@ func CheckConditions(
 
 	if !r.unless.IsEmpty() {
 		// An unless condition is defined
-		unlessCondition, err := CheckCondition(ctx, r, r.unless, opts, executor)
+		unlessCondition, err := CheckCondition(ctx, r, r.unless, opts, executor, env)
 		if err != nil {
 			return false, err
 		}
@@ -101,12 +102,14 @@ func CheckCondition(
 	c Condition,
 	opts RunOpts,
 	executor Executor,
+	env map[string]string,
 ) (bool, error) {
 
 	if c.ResourceExists != "" {
+		pattern := substituteVars(c.ResourceExists, env)
 		// The "resource exists" condition evaluates to true if one or more resources
 		// match the provided filename or glob pattern
-		resources, err := matchResources(r.Component(), r.inProvider, []string{c.ResourceExists})
+		resources, err := matchResources(r.Component(), r.inProvider, []string{pattern})
 		if err != nil {
 			return false, err
 		}
@@ -114,7 +117,8 @@ func CheckCondition(
 	}
 
 	if c.DirectoryExists != "" {
-		dirPath := path.Join(r.Component().Directory(), c.DirectoryExists)
+		directoryName := substituteVars(c.DirectoryExists, env)
+		dirPath := path.Join(r.Component().Directory(), directoryName)
 		if stat, err := os.Stat(dirPath); err == nil && stat.IsDir() {
 			return true, nil
 		}
@@ -128,7 +132,7 @@ func CheckCondition(
 		err := executor.Execute(ctx, ExecOpts{
 			Command:          c.ScriptSucceeds.Run,
 			WorkingDirectory: r.Component().Directory(),
-			Env:              flattenEnvironment(r.BaseEnvironment()),
+			Env:              flattenEnvironment(env),
 			Image:            r.Image(),
 			Name:             fmt.Sprintf("%s.condition", r.NodeID()),
 			Stdout:           &outputBuffer,
@@ -147,8 +151,9 @@ func CheckCondition(
 		// If "with_output" is set, the condition is met if the script output
 		// exactly matches the expected output.
 		if c.ScriptSucceeds.WithOutput != "" {
+			requiredOutput := substituteVars(c.ScriptSucceeds.WithOutput, env)
 			outputStr := strings.TrimSpace(outputBuffer.String())
-			return outputStr == c.ScriptSucceeds.WithOutput, nil
+			return outputStr == requiredOutput, nil
 		}
 		return true, nil
 	}

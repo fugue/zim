@@ -79,16 +79,6 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		primaryExecutor = opts.Executor
 	}
 
-	// Evaluate rule conditions which could lead to rule execution being skipped.
-	// Any scripting done to check the condition will be via the bash executor.
-	conditionsMet, err := CheckConditions(ctx, r, opts, bashExecutor)
-	if err != nil {
-		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
-	}
-	if !conditionsMet {
-		return Skipped, nil
-	}
-
 	// Generate the bash environment variables to be available to the execution
 	bashEnv, err := r.Environment()
 	if err != nil {
@@ -97,6 +87,17 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	if err := runner.setArtifactVariables(r, bashExecutor, bashEnv); err != nil {
 		return Error, err
 	}
+
+	// Evaluate rule conditions which could lead to rule execution being skipped.
+	// Any scripting done to check the condition will be via the bash executor.
+	conditionsMet, err := CheckConditions(ctx, r, opts, bashExecutor, bashEnv)
+	if err != nil {
+		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
+	}
+	if !conditionsMet {
+		return Skipped, nil
+	}
+
 	// Generate a second set of environment variables for the primary executor.
 	// This supports the primary executor being dockerized, in which case the
 	// ARTIFACTS_DIR and ARTIFACT variables differ due to absolute paths changing.
