@@ -49,32 +49,33 @@ func TestRuleCondition(t *testing.T) {
 		Debug:       false,
 	}
 	ctx := context.Background()
+	env := map[string]string{}
 
 	// "when" condition is true
 	build, found := comp.Rule("build-when-run")
 	require.True(t, found)
-	conditionsMet, err := CheckConditions(ctx, build, execOpts, executor)
+	conditionsMet, err := CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.True(t, conditionsMet)
 
 	// "when" condition is false
 	build, found = comp.Rule("build-when-skip")
 	require.True(t, found)
-	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor)
+	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.False(t, conditionsMet)
 
 	// "unless" condition is false (so the rule should run)
 	build, found = comp.Rule("build-unless-run")
 	require.True(t, found)
-	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor)
+	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.True(t, conditionsMet)
 
 	// "unless" condition is true (so the rule should NOT run)
 	build, found = comp.Rule("build-unless-skip")
 	require.True(t, found)
-	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor)
+	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.False(t, conditionsMet)
 }
@@ -85,6 +86,7 @@ func TestConditionScript(t *testing.T) {
 	defer os.RemoveAll(dir)
 	ctx := context.Background()
 	executor := NewBashExecutor()
+	env := map[string]string{}
 
 	c := &Component{name: "test-comp", componentDir: dir}
 	r := &Rule{component: c, name: "test-rule"}
@@ -159,7 +161,7 @@ func TestConditionScript(t *testing.T) {
 			DebugOutput: &stdout,
 			Debug:       false,
 		}
-		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor)
+		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor, env)
 		if conditionsMet != tc.want {
 			t.Errorf("expected: %v, got: %v", tc.want, conditionsMet)
 		}
@@ -200,6 +202,7 @@ func TestExistsConditions(t *testing.T) {
 		name:       "test-rule",
 		inProvider: fs,
 	}
+	env := map[string]string{}
 
 	type test struct {
 		input   Condition
@@ -233,7 +236,7 @@ func TestExistsConditions(t *testing.T) {
 	for _, tc := range tests {
 		var stdout bytes.Buffer
 		runOpts := RunOpts{Output: &stdout, DebugOutput: &stdout, Debug: false}
-		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor)
+		conditionsMet, err := CheckCondition(ctx, r, tc.input, runOpts, executor, env)
 		if conditionsMet != tc.want {
 			t.Errorf("expected: %v, got: %v", tc.want, conditionsMet)
 		}

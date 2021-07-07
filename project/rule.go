@@ -126,20 +126,20 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 	r.ignore = substituteVarsSlice(r.ignore, variables)
 	r.outputs = substituteVarsSlice(r.outputs, variables)
 	r.when = Condition{
-		ResourceExists:  substituteVars(self.When.ResourceExists, variables),
-		DirectoryExists: substituteVars(self.When.DirectoryExists, variables),
+		ResourceExists:  self.When.ResourceExists,
+		DirectoryExists: self.When.DirectoryExists,
 		ScriptSucceeds: ConditionScript{
-			Run:           substituteVars(self.When.ScriptSucceeds.Run, variables),
-			WithOutput:    substituteVars(self.When.ScriptSucceeds.WithOutput, variables),
+			Run:           self.When.ScriptSucceeds.Run,
+			WithOutput:    self.When.ScriptSucceeds.WithOutput,
 			SuppressError: self.When.ScriptSucceeds.SuppressError,
 		},
 	}
 	r.unless = Condition{
-		ResourceExists:  substituteVars(self.Unless.ResourceExists, variables),
-		DirectoryExists: substituteVars(self.Unless.DirectoryExists, variables),
+		ResourceExists:  self.Unless.ResourceExists,
+		DirectoryExists: self.Unless.DirectoryExists,
 		ScriptSucceeds: ConditionScript{
-			Run:           substituteVars(self.Unless.ScriptSucceeds.Run, variables),
-			WithOutput:    substituteVars(self.Unless.ScriptSucceeds.WithOutput, variables),
+			Run:           self.Unless.ScriptSucceeds.Run,
+			WithOutput:    self.Unless.ScriptSucceeds.WithOutput,
 			SuppressError: self.Unless.ScriptSucceeds.SuppressError,
 		},
 	}

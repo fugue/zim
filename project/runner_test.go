@@ -38,12 +38,12 @@ func TestStandardRunner(t *testing.T) {
 	testComponentFile(cDir, "main.go", "package main")
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "a",
 			Path: cYaml,
 			Kind: "flurble",
 			Rules: map[string]definitions.Rule{
-				"build": definitions.Rule{
+				"build": {
 					Description: "build",
 					Inputs:      []string{"main.go"},
 					Outputs:     []string{"myartifact"},
@@ -85,8 +85,7 @@ func TestStandardRunner(t *testing.T) {
 		"ROOT":          dir,
 	})
 	buf := bytes.Buffer{}
-	var writer io.Writer
-	writer = &buf
+	var writer io.Writer = &buf
 
 	m := NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().AnyTimes()
@@ -114,13 +113,6 @@ func TestStandardRunner(t *testing.T) {
 	})
 	require.Nil(t, err)
 	require.Equal(t, OK, code)
-}
-
-func stringSliceAsInterface(s []string) (result []interface{}) {
-	for _, item := range s {
-		result = append(result, item)
-	}
-	return
 }
 
 func commandSliceAsInterface(cmds []map[string]string) (result []interface{}) {
@@ -158,7 +150,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 	testComponentFile(cDir, "main.go", "package main")
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "widget",
 			Path: cYaml,
 			Kind: "flurble",
@@ -166,10 +158,11 @@ func TestStandardRunnerDockerized(t *testing.T) {
 				Image: "go:123",
 			},
 			Rules: map[string]definitions.Rule{
-				"twist-it": definitions.Rule{
+				"twist-it": {
+					Inputs: []string{"main.go"},
 					Commands: commandSliceAsInterface([]map[string]string{
-						map[string]string{"run": "echo TWIST IT"},
-						map[string]string{"run": "echo BOP IT"},
+						{"run": "echo TWIST IT"},
+						{"run": "echo BOP IT"},
 					}),
 				},
 			},
@@ -190,7 +183,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 		"COMPONENT":     "widget",
 		"DEP":           "",
 		"DEPS":          "",
-		"INPUT":         "",
+		"INPUT":         "main.go",
 		"OUTPUT":        "",
 		"OUTPUTS":       "",
 		"KIND":          "flurble",
@@ -200,8 +193,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 		"ROOT":          dir,
 	})
 	buf := bytes.Buffer{}
-	var writer io.Writer
-	writer = &buf
+	var writer io.Writer = &buf
 
 	m := NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().Return(true).AnyTimes()
@@ -248,16 +240,17 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 
 	dir := testDir()
 	defer os.RemoveAll(dir)
+	artifactsDir := path.Join(dir, "artifacts")
 	cDir, cYaml := testComponentDir(dir, "a")
 	testComponentFile(cDir, "main.go", "package main")
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "widget",
 			Path: cYaml,
 			Kind: "flurble",
 			Rules: map[string]definitions.Rule{
-				"twist-it": definitions.Rule{
+				"twist-it": {
 					When: definitions.Condition{
 						ScriptSucceeds: definitions.ConditionScript{
 							Run:           "exit 1", // Prevents execution
@@ -265,7 +258,7 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 						},
 					},
 					Commands: commandSliceAsInterface([]map[string]string{
-						map[string]string{"run": "echo TWIST IT"},
+						{"run": "echo TWIST IT"},
 					}),
 				},
 			},
@@ -283,13 +276,22 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 	m := NewMockExecutor(ctrl)
 
 	expectedEnv := flattenEnvironment(map[string]string{
-		"COMPONENT": "widget",
-		"KIND":      "flurble",
-		"NAME":      "widget",
-		"NODE_ID":   "widget.twist-it",
-		"RULE":      "twist-it",
+		"COMPONENT":     "widget",
+		"KIND":          "flurble",
+		"NAME":          "widget",
+		"NODE_ID":       "widget.twist-it",
+		"RULE":          "twist-it",
+		"ARTIFACTS_DIR": "/path/to/artifacts",
+		"DEP":           "",
+		"DEPS":          "",
+		"INPUT":         "",
+		"OUTPUT":        "",
+		"OUTPUTS":       "",
+		"ROOT":          "/path/to/root",
 	})
 
+	m.EXPECT().ExecutorPath(dir).Return("/path/to/root", nil)
+	m.EXPECT().ExecutorPath(artifactsDir).Return("/path/to/artifacts", nil)
 	m.EXPECT().UsesDocker().Return(false).AnyTimes()
 	m.EXPECT().Execute(ctx, ExecOpts{
 		Command:          "exit 1",
@@ -319,23 +321,24 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 
 	dir := testDir()
 	defer os.RemoveAll(dir)
+	artifactsDir := path.Join(dir, "artifacts")
 	cDir, cYaml := testComponentDir(dir, "a")
 	testComponentFile(cDir, "main.go", "package main")
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "widget",
 			Path: cYaml,
 			Kind: "flurble",
 			Rules: map[string]definitions.Rule{
-				"twist-it": definitions.Rule{
+				"twist-it": {
 					Unless: definitions.Condition{
 						ScriptSucceeds: definitions.ConditionScript{
 							Run: "exit 0", // Prevents execution
 						},
 					},
 					Commands: commandSliceAsInterface([]map[string]string{
-						map[string]string{"run": "echo TWIST IT"},
+						{"run": "echo TWIST IT"},
 					}),
 				},
 			},
@@ -353,15 +356,23 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	m := NewMockExecutor(ctrl)
 
 	expectedEnv := flattenEnvironment(map[string]string{
-		"COMPONENT": "widget",
-		"KIND":      "flurble",
-		"NAME":      "widget",
-		"NODE_ID":   "widget.twist-it",
-		"RULE":      "twist-it",
+		"COMPONENT":     "widget",
+		"KIND":          "flurble",
+		"NAME":          "widget",
+		"NODE_ID":       "widget.twist-it",
+		"RULE":          "twist-it",
+		"ARTIFACTS_DIR": "/path/to/artifacts",
+		"DEP":           "",
+		"DEPS":          "",
+		"INPUT":         "",
+		"OUTPUT":        "",
+		"OUTPUTS":       "",
+		"ROOT":          "/path/to/root",
 	})
 
 	m.EXPECT().UsesDocker().Return(false).AnyTimes()
-	m.EXPECT().ExecutorPath(gomock.Any()).Return("ignored", nil).AnyTimes()
+	m.EXPECT().ExecutorPath(dir).Return("/path/to/root", nil)
+	m.EXPECT().ExecutorPath(artifactsDir).Return("/path/to/artifacts", nil)
 	m.EXPECT().Execute(ctx, ExecOpts{
 		Command:          "exit 0",
 		WorkingDirectory: cDir,
@@ -589,7 +600,7 @@ func TestEmptyCommand(t *testing.T) {
 		name:      "test-rule",
 		local:     true,
 		// A run command with an empty argument should not be executed
-		commands: []*Command{&Command{Kind: "run", Argument: ""}},
+		commands: []*Command{{Kind: "run", Argument: ""}},
 	}
 
 	code, err := runner.Run(ctx, r, RunOpts{Executor: executor})
