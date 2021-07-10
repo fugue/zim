@@ -38,7 +38,6 @@ func NewListRulesCommand() *cobra.Command {
 		Short:   "List rules in the project",
 		Aliases: []string{"r", "rule", "rules"},
 		Run: func(cmd *cobra.Command, args []string) {
-
 			opts := getZimOptions(cmd, args)
 			proj, err := getProject(opts.Directory)
 			if err != nil {
@@ -48,13 +47,12 @@ func NewListRulesCommand() *cobra.Command {
 			if err != nil {
 				fatal(err)
 			}
-
 			var rows []interface{}
 			for _, c := range comps {
-				for _, r := range c.Rules() {
+				for _, ruleName := range c.RuleNames() {
 					rows = append(rows, listRulesViewItem{
 						Component: c.Name(),
-						Rule:      r.Name(),
+						Rule:      ruleName,
 					})
 				}
 			}
@@ -66,7 +64,6 @@ func NewListRulesCommand() *cobra.Command {
 			if err != nil {
 				fatal(err)
 			}
-
 			for _, tableRow := range table {
 				fmt.Println(tableRow)
 			}

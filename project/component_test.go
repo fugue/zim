@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fugue/zim/definitions"
@@ -42,24 +43,13 @@ func TestNewComponent(t *testing.T) {
 		Path: "/repo/foo/component.yaml",
 	}
 	c, err := NewComponent(p, self)
-	if err != nil {
-		t.Fatal("Unexpected error:", err)
-	}
-	if c == nil {
-		t.Fatal("Expected a Component to be returned; got nil")
-	}
-	if c.Directory() != "/repo/foo" {
-		t.Error("Incorrect directory:", c.Directory())
-	}
-	if c.Name() != "foo" {
-		t.Error("Incorrect name:", c.Name())
-	}
-	if len(c.Rules()) != 0 {
-		t.Error("Expected empty rule names")
-	}
-	if _, ruleFound := c.Rule("WHUT"); ruleFound {
-		t.Error("Expected rule not to be found")
-	}
+	require.Nil(t, err)
+	require.NotNil(t, c)
+	assert.Equal(t, "/repo/foo", c.Directory())
+	assert.Equal(t, "foo", c.Name())
+	assert.Len(t, c.RuleNames(), 0)
+	_, err = c.Rule("WHUT")
+	assert.NotNil(t, err)
 }
 
 func TestNewComponentEmptyRule(t *testing.T) {
@@ -69,29 +59,17 @@ func TestNewComponentEmptyRule(t *testing.T) {
 		providers: map[string]Provider{},
 	}
 	self := &definitions.Component{
-		Path: "/repo/foo/component.yaml",
-		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{},
-		},
+		Path:  "/repo/foo/component.yaml",
+		Rules: map[string]definitions.Rule{"build": {}},
 	}
 	c, _ := NewComponent(p, self)
-	if c == nil {
-		t.Fatal("Expected a Component to be returned; got nil")
-	}
-	rule, found := c.Rule("build")
-	if !found {
-		t.Fatal("Expected build rule to exist")
-	}
-	if len(rule.Outputs()) != 0 {
-		t.Error("Expected empty slices")
-	}
+	require.NotNil(t, c)
+	rule, err := c.Rule("build")
+	require.Nil(t, err)
+	require.Len(t, rule.Outputs(), 0)
 	inputs, err := rule.Inputs()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(inputs) != 0 {
-		t.Error("Expected empty inputs")
-	}
+	require.Nil(t, err)
+	require.Len(t, inputs, 0)
 }
 
 func TestNewComponentRule(t *testing.T) {
@@ -112,7 +90,7 @@ func TestNewComponentRule(t *testing.T) {
 	self := &definitions.Component{
 		Path: cDefPath,
 		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{
+			"build": {
 				Description: "build it!",
 				Inputs:      []string{"${NAME}.go", "*.go", "go.mod"},
 				Ignore:      []string{"exclude_me.go"},
@@ -123,25 +101,15 @@ func TestNewComponentRule(t *testing.T) {
 		Environment: map[string]string{"VOLUME": "11"},
 	}
 	c, _ := NewComponent(p, self)
-	if c == nil {
-		t.Fatal("Expected a Component to be returned; got nil")
-	}
+	require.NotNil(t, c)
+	rule, err := c.Rule("build")
+	require.Nil(t, err)
 
-	rule, found := c.Rule("build")
-	if !found {
-		t.Fatal("Expected build rule to exist")
-	}
 	if !reflect.DeepEqual(c.Select([]string{"unknown", "build"}), []*Rule{rule}) {
 		t.Error("Expected build rule to be selected")
 	}
-	if !reflect.DeepEqual(c.Rules(), []*Rule{rule}) {
-		t.Error("Expected build rule to be present")
-	}
-
 	inputs, err := rule.Inputs()
-	if err != nil {
-		t.Fatalf("Unexpected error: %s", err)
-	}
+	require.Nil(t, err)
 
 	if !reflect.DeepEqual(inputs.Paths(), []string{
 		path.Join(dir, "src/foo/foo.go"),

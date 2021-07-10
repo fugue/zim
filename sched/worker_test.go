@@ -63,8 +63,8 @@ func TestWorker(t *testing.T) {
 	c := p.Components().WithName("widget").First()
 	require.NotNil(t, c)
 
-	build, found := c.Rule("build")
-	require.True(t, found)
+	build, err := c.Rule("build")
+	require.Nil(t, err)
 
 	runner := project.RunnerFunc(func(ctx context.Context, rule *project.Rule, opts project.RunOpts) (project.Code, error) {
 		assert.Equal(t, build, rule)

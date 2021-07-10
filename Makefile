@@ -79,7 +79,7 @@ clean:
 
 .PHONY: test
 test:
-	$(GO) test -v -cover ./...
+	$(GO) test -cover ./...
 
 .PHONY: coverage
 coverage:

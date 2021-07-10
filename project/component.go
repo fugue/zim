@@ -192,21 +192,23 @@ func (c *Component) RuleName(name string, parameters map[string]interface{}) str
 	return result
 }
 
-// Rule returns the Component rule with the given name, if it exists,
-// along with a boolean that indicates whether it was found
-func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (*Rule, bool) {
+// HasRule returns true if the Component has a Rule defined with the given name
+func (c *Component) HasRule(name string) bool {
+	_, found := c.def.Rules[name]
+	return found
+}
 
-	// Retrieve the rule definition with that name
+// Rule returns the Component rule with the given name if it exists
+func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (*Rule, error) {
+
 	ruleDef, found := c.def.Rules[name]
 	if !found {
-		return nil, false
+		return nil, fmt.Errorf("component %s does not define rule: %s", c.Name(), name)
 	}
-
 	var parameters map[string]interface{}
 	if len(optParameters) > 0 {
 		parameters = optParameters[0]
 	}
-
 	// Resolve rule parameter values
 	values := map[string]interface{}{}
 
@@ -229,7 +231,7 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 	builtIns := []string{"COMPONENT", "NAME", "KIND", "RULE"}
 
 	if err := envsub.Eval(state, values); err != nil {
-		return nil, false
+		return nil, fmt.Errorf("failed to evaluate rule parameters: %w", err)
 	}
 	for _, name := range builtIns {
 		delete(state, name)
@@ -239,36 +241,46 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 	fullName := RuleName(name, state)
 	rule, found := c.rules[fullName]
 	if found {
-		return rule, true
+		return rule, nil
 	}
 	rule, err := NewRule(name, fullName, values, c, &ruleDef)
 	if err != nil {
-		return nil, false
+		return nil, fmt.Errorf("failed to create rule instance: %w", err)
 	}
 	if err := rule.resolveDeps(); err != nil {
-		return nil, false
+		return nil, fmt.Errorf("failed to resolve rule dependencies: %w", err)
 	}
 	c.rules[fullName] = rule
-	return rule, true
+	return rule, nil
 }
 
 // MustRule returns the named rule or panics if it is not found
-func (c *Component) MustRule(name string) *Rule {
-	r, found := c.Rule(name)
-	if !found {
-		panic(fmt.Sprintf("Component %s has no rule %s", c.Name(), name))
+func (c *Component) MustRule(name string, parameters ...map[string]interface{}) *Rule {
+	rule, err := c.Rule(name, parameters...)
+	if err != nil {
+		panic(err)
 	}
-	return r
+	return rule
+}
+
+// RuleNames returns a list of all rule names defined in this Component
+func (c *Component) RuleNames() []string {
+	var names []string
+	for name := range c.def.Rules {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // Rules returns a slice containing all Rules defined by this Component
-func (c *Component) Rules() []*Rule {
-	rules := make([]*Rule, 0, len(c.rules))
-	for _, r := range c.rules {
-		rules = append(rules, r)
-	}
-	return rules
-}
+// func (c *Component) Rules() []*Rule {
+// 	rules := make([]*Rule, 0, len(c.rules))
+// 	for _, r := range c.rules {
+// 		rules = append(rules, r)
+// 	}
+// 	return rules
+// }
 
 // Export returns the Component export with the given name, if it exists
 func (c *Component) Export(name string) (e *Export, found bool) {
@@ -300,7 +312,11 @@ func (c *Component) Select(names []string) (result []*Rule) {
 // Environment returns environment variables applicable to this Component
 func (c *Component) Environment() map[string]string {
 	// Return a copy so that the original map cannot be modified
-	return copyEnvironment(c.env)
+	env := copyEnvironment(c.env)
+	env["COMPONENT"] = c.name
+	env["NAME"] = c.name
+	env["KIND"] = c.kind
+	return env
 }
 
 // resolveDeps processes inter-rule dependencies

@@ -132,8 +132,17 @@ func NewRunCommand() *cobra.Command {
 			// in order of rule dependencies
 			var schedulerErr error
 			scheduler := sched.NewGraphScheduler()
-			for _, rule := range opts.Rules {
-				rules := components.Rules([]string{rule})
+			for _, ruleName := range opts.Rules {
+				var rules []*project.Rule
+				for _, component := range components {
+					if component.HasRule(ruleName) {
+						rule, err := component.Rule(ruleName)
+						if err != nil {
+							fatal(err)
+						}
+						rules = append(rules, rule)
+					}
+				}
 				if len(rules) == 0 {
 					return
 				}

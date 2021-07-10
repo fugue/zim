@@ -223,10 +223,9 @@ func (r *Rule) resolveExport(dep *Dependency) (*Export, error) {
 // If the Dependency component name is blank, the component is assumed
 // to be the one containing this Rule.
 func (r *Rule) resolveDep(dep *Dependency) (*Rule, error) {
-	depRule, found := r.Component().Project().Resolve(dep)
-	if !found {
-		return nil, fmt.Errorf("Invalid dep - rule not found: %s.%s",
-			dep.Component, dep.Rule)
+	depRule, err := r.Component().Project().Resolve(dep)
+	if err != nil {
+		return nil, err
 	}
 	dep.ResolvedRule = depRule
 	return depRule, nil
@@ -234,14 +233,9 @@ func (r *Rule) resolveDep(dep *Dependency) (*Rule, error) {
 
 // BaseEnvironment returns Rule environment variables that are known upfront
 func (r *Rule) BaseEnvironment() map[string]string {
-	c := r.Component()
-	env := combineEnvironment(c.Environment(), map[string]string{
-		"COMPONENT": c.Name(),
-		"NAME":      c.Name(),
-		"KIND":      c.Kind(),
-		"RULE":      r.Name(),
-		"NODE_ID":   r.NodeID(),
-	})
+	env := r.Component().Environment() // this copy can be freely modified
+	env["RULE"] = r.Name()
+	env["NODE_ID"] = r.NodeID()
 	for k, v := range r.parameters {
 		env[k] = fmt.Sprintf("%v", v)
 	}

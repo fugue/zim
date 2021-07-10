@@ -120,11 +120,11 @@ func TestRule(t *testing.T) {
 	assert.Equal(t, "foo", foo.Name())
 	assert.Equal(t, "bar", bar.Name())
 
-	test, found := foo.Rule("test")
-	require.True(t, found)
+	test, err := foo.Rule("test")
+	require.Nil(t, err)
 
-	build, found := foo.Rule("build")
-	require.True(t, found)
+	build, err := foo.Rule("build")
+	require.Nil(t, err)
 
 	assert.Equal(t, "foo.test", test.NodeID())
 	assert.Equal(t, "foo.build", build.NodeID())
@@ -177,8 +177,8 @@ func TestRuleMissingDepOutputs(t *testing.T) {
 	c := p.Components().WithName("bar").First()
 	require.NotNil(t, c)
 
-	_, found := c.Rule("build")
-	require.False(t, found)
+	_, err = c.Rule("build")
+	require.NotNil(t, err)
 }
 
 func TestRuleOutputs(t *testing.T) {
@@ -199,13 +199,10 @@ func TestRuleOutputs(t *testing.T) {
 	require.NotNil(t, bar)
 	require.Equal(t, "bar", bar.Name())
 
-	build, found := bar.Rule("build")
-	require.True(t, found)
+	build, err := bar.Rule("build")
+	require.Nil(t, err)
 
 	outs, err := build.Outputs().RelativePaths(p.RootAbsPath())
 	require.Nil(t, err)
 	assert.Equal(t, []string{path.Join("artifacts", "bar")}, outs)
-
-	// absOuts := build.OutputsAbs()
-	// assert.Equal(t, []string{path.Join(dir, "artifacts", "bar")}, absOuts)
 }

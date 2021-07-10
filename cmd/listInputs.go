@@ -53,7 +53,11 @@ func NewListInputsCommand() *cobra.Command {
 
 			var rows []interface{}
 			for _, c := range comps {
-				for _, r := range c.Rules() {
+				for _, ruleName := range c.RuleNames() {
+					r, err := c.Rule(ruleName, nil)
+					if err != nil {
+						fatal(err)
+					}
 					inputs, err := r.Inputs()
 					if err != nil {
 						fatal(err)

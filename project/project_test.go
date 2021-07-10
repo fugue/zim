@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/stretchr/testify/require"
 )
 
 func testDir(parent ...string) string {
@@ -195,30 +196,25 @@ func TestResolveDeps(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "a",
 			Kind: "python",
 			Path: path.Join(dir, "a", "component.yaml"),
 			Rules: map[string]definitions.Rule{
-				"build": definitions.Rule{
+				"build": {
 					Description: "a-build",
 					Requires: []definitions.Dependency{
-						definitions.Dependency{
-							Component: "b",
-							Rule:      "build",
-						},
+						{Component: "b", Rule: "build"},
 					},
 				},
 			},
 		},
-		&definitions.Component{
+		{
 			Name: "b",
 			Kind: "go",
 			Path: path.Join(dir, "b", "component.yaml"),
 			Rules: map[string]definitions.Rule{
-				"build": definitions.Rule{
-					Description: "b-build",
-				},
+				"build": {Description: "b-build"},
 			},
 		},
 	}
@@ -232,19 +228,11 @@ func TestResolveDeps(t *testing.T) {
 		t.Fatal("Failed to find component 'a'")
 	}
 	a := matches[0]
-	rule, found := a.Rule("build")
-	if !found {
-		t.Fatal("Failed to find build rule")
-	}
-	if rule.NodeID() != "a.build" {
-		t.Errorf("Incorrect rule node ID: %s", rule.NodeID())
-	}
+	rule, err := a.Rule("build")
+	require.Nil(t, err)
+	require.Equal(t, "a.build", rule.NodeID())
 	deps := rule.Dependencies()
-	if len(deps) != 1 {
-		t.Fatalf("Incorrect number of dependencies; got %d expected 1", len(deps))
-	}
+	require.Len(t, deps, 1)
 	dep := deps[0]
-	if dep.NodeID() != "b.build" {
-		t.Fatal("Expected dependency to be 'b.build'")
-	}
+	require.Equal(t, "b.build", dep.NodeID())
 }

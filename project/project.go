@@ -210,16 +210,12 @@ func (p *Project) Select(names, kinds []string) (Components, error) {
 }
 
 // Resolve the dependency, returning the Rule it references
-func (p *Project) Resolve(dep *Dependency) (*Rule, bool) {
+func (p *Project) Resolve(dep *Dependency) (*Rule, error) {
 	component := p.Components().WithName(dep.Component).First()
 	if component == nil {
-		return nil, false
+		return nil, fmt.Errorf("unknown component: %s", dep.Component)
 	}
-	rule, found := component.Rule(dep.Rule, dep.Parameters)
-	if !found {
-		return nil, false
-	}
-	return rule, true
+	return component.Rule(dep.Rule, dep.Parameters)
 }
 
 // Export returns the specified Export and a boolean indicating whether it was found

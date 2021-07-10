@@ -64,7 +64,13 @@ func TestScheduler(t *testing.T) {
 		ComponentDefs: defs,
 	})
 	require.Nil(t, err)
-	buildRules := p.Components().Rules([]string{"build"})
+
+	var buildRules []*project.Rule
+	for _, component := range p.Components() {
+		rule, err := component.Rule("build")
+		require.Nil(t, err)
+		buildRules = append(buildRules, rule)
+	}
 	require.Len(t, buildRules, 2)
 
 	widget := p.Components().WithName("widget").First()

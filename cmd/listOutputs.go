@@ -58,7 +58,11 @@ func NewListArtifactsCommand() *cobra.Command {
 			var rows []interface{}
 			var rowColors []*color.Color
 			for _, c := range comps {
-				for _, r := range c.Rules() {
+				for _, ruleName := range c.RuleNames() {
+					r, err := c.Rule(ruleName, nil)
+					if err != nil {
+						fatal(err)
+					}
 					missingOutputs, err := r.MissingOutputs().RelativePaths(projDir)
 					if err != nil {
 						fatal(err)

@@ -52,29 +52,29 @@ func TestRuleCondition(t *testing.T) {
 	env := map[string]string{}
 
 	// "when" condition is true
-	build, found := comp.Rule("build-when-run")
-	require.True(t, found)
+	build, err := comp.Rule("build-when-run")
+	require.Nil(t, err)
 	conditionsMet, err := CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.True(t, conditionsMet)
 
 	// "when" condition is false
-	build, found = comp.Rule("build-when-skip")
-	require.True(t, found)
+	build, err = comp.Rule("build-when-skip")
+	require.Nil(t, err)
 	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.False(t, conditionsMet)
 
 	// "unless" condition is false (so the rule should run)
-	build, found = comp.Rule("build-unless-run")
-	require.True(t, found)
+	build, err = comp.Rule("build-unless-run")
+	require.Nil(t, err)
 	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.True(t, conditionsMet)
 
 	// "unless" condition is true (so the rule should NOT run)
-	build, found = comp.Rule("build-unless-skip")
-	require.True(t, found)
+	build, err = comp.Rule("build-unless-skip")
+	require.Nil(t, err)
 	conditionsMet, err = CheckConditions(ctx, build, execOpts, executor, env)
 	require.Nil(t, err)
 	require.False(t, conditionsMet)
