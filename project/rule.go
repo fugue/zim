@@ -122,6 +122,8 @@ func NewRule(
 		parameters:        parameters,
 	}
 	variables := envsub.GenericMap(r.BaseEnvironment())
+	variables["ARTIFACTS_DIR"] = r.ArtifactsDir()
+	variables["ROOT"] = c.Project().RootAbsPath()
 
 	for _, dep := range self.Requires {
 		ruleDep := &Dependency{
