@@ -22,21 +22,20 @@ import (
 
 	"github.com/fugue/zim/definitions"
 	"github.com/fugue/zim/envsub"
-	"github.com/hashicorp/go-multierror"
 )
 
 // NewComponent initializes a Component from its YAML definition.
 func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 
 	if self == nil {
-		return nil, errors.New("Component definition is nil")
+		return nil, errors.New("component definition is nil")
 	}
 	if self.Path == "" {
-		return nil, errors.New("Component definition path is empty")
+		return nil, errors.New("component definition path is empty")
 	}
 	absPath, err := filepath.Abs(self.Path)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to resolve path: %s", err)
+		return nil, fmt.Errorf("failed to resolve path: %s", err)
 	}
 	componentDir := filepath.Dir(absPath)
 	name := self.Name
@@ -45,7 +44,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 	}
 	relPath, err := filepath.Rel(p.RootAbsPath(), componentDir)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to determine relative path: %s", err)
+		return nil, fmt.Errorf("failed to determine relative path: %s", err)
 	}
 
 	c := Component{
@@ -106,14 +105,11 @@ type Toolchain struct {
 type Component struct {
 	project      *Project
 	componentDir string
-	repoDir      string
 	relPath      string
-	artifactDir  string
 	name         string
 	app          string
 	kind         string
 	dockerImage  string
-	sources      []string
 	rules        map[string]*Rule
 	exports      map[string]*Export
 	env          map[string]string
@@ -199,26 +195,43 @@ func (c *Component) HasRule(name string) bool {
 }
 
 // Rule returns the Component rule with the given name if it exists
-func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (*Rule, error) {
+func (c *Component) Rule(
+	name string,
+	optParameters ...map[string]interface{},
+) (*Rule, error) {
 
 	ruleDef, found := c.def.Rules[name]
 	if !found {
-		return nil, fmt.Errorf("component %s does not define rule: %s", c.Name(), name)
+		return nil, fmt.Errorf("unknown rule: %s.%s", c.Name(), name)
 	}
 	var parameters map[string]interface{}
 	if len(optParameters) > 0 {
 		parameters = optParameters[0]
 	}
-	// Resolve rule parameter values
-	values := map[string]interface{}{}
 
+	// Raise an error if unknown parameters were supplied
+	for paramName := range parameters {
+		if _, found := ruleDef.Parameters[paramName]; !found {
+			return nil, fmt.Errorf("unknown parameter for %s.%s: %s",
+				c.Name(), name, paramName)
+		}
+	}
+
+	// Resolve the value for each parameter
+	values := map[string]interface{}{}
 	for pName, param := range ruleDef.Parameters {
 		value, ok := parameters[pName]
-		// TODO: type checking
 		if ok {
 			values[pName] = value
-		} else { // TODO: handle required parameters
+		} else if param.Default != nil {
 			values[pName] = param.Default
+		} else {
+			return nil, fmt.Errorf("required parameter was not set for %s.%s: %s",
+				c.Name(), name, pName)
+		}
+		if err := typeCheckParameter(param.Type, values[pName]); err != nil {
+			return nil, fmt.Errorf("incorrect parameter type for %s.%s %s: %w",
+				c.Name(), name, pName, err)
 		}
 	}
 
@@ -243,14 +256,16 @@ func (c *Component) Rule(name string, optParameters ...map[string]interface{}) (
 	if found {
 		return rule, nil
 	}
-	rule, err := NewRule(name, fullName, values, c, &ruleDef)
+
+	rule, err := NewRule(name, fullName, state, c, &ruleDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rule instance: %w", err)
 	}
-	if err := rule.resolveDeps(); err != nil {
-		return nil, fmt.Errorf("failed to resolve rule dependencies: %w", err)
-	}
 	c.rules[fullName] = rule
+
+	if err := rule.resolveDeps(); err != nil {
+		return nil, err
+	}
 	return rule, nil
 }
 
@@ -273,19 +288,13 @@ func (c *Component) RuleNames() []string {
 	return names
 }
 
-// Rules returns a slice containing all Rules defined by this Component
-// func (c *Component) Rules() []*Rule {
-// 	rules := make([]*Rule, 0, len(c.rules))
-// 	for _, r := range c.rules {
-// 		rules = append(rules, r)
-// 	}
-// 	return rules
-// }
-
 // Export returns the Component export with the given name, if it exists
-func (c *Component) Export(name string) (e *Export, found bool) {
-	e, found = c.exports[name]
-	return
+func (c *Component) Export(name string) (*Export, error) {
+	export, found := c.exports[name]
+	if !found {
+		return nil, fmt.Errorf("unknown export %s from component %s", name, c.Name())
+	}
+	return export, nil
 }
 
 // Exports returns a slice containing all Exports defined by this Component
@@ -297,18 +306,6 @@ func (c *Component) Exports() []*Export {
 	return exports
 }
 
-// Select finds Rules belonging to this Component with the provided names.
-// Unknown names are just ignored.
-func (c *Component) Select(names []string) (result []*Rule) {
-	for _, name := range names {
-		if _, found := c.def.Rules[name]; found {
-			r, _ := c.Rule(name, nil)
-			result = append(result, r)
-		}
-	}
-	return
-}
-
 // Environment returns environment variables applicable to this Component
 func (c *Component) Environment() map[string]string {
 	// Return a copy so that the original map cannot be modified
@@ -317,17 +314,6 @@ func (c *Component) Environment() map[string]string {
 	env["NAME"] = c.name
 	env["KIND"] = c.kind
 	return env
-}
-
-// resolveDeps processes inter-rule dependencies
-func (c *Component) resolveDeps() error {
-	var result *multierror.Error
-	for _, rule := range c.rules {
-		if err := rule.resolveDeps(); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-	return result.ErrorOrNil()
 }
 
 // Toolchain returns this Components active toolchain information

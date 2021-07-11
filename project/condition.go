@@ -20,6 +20,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/fugue/zim/envsub"
 )
 
 // ConditionScript defines a shell script to run for a Condition check
@@ -105,8 +107,13 @@ func CheckCondition(
 	env map[string]string,
 ) (bool, error) {
 
+	variables := envsub.GenericMap(env)
+
 	if c.ResourceExists != "" {
-		pattern := substituteVars(c.ResourceExists, env)
+		pattern, err := envsub.EvalString(c.ResourceExists, variables)
+		if err != nil {
+			return false, err
+		}
 		// The "resource exists" condition evaluates to true if one or more resources
 		// match the provided filename or glob pattern
 		resources, err := matchResources(r.Component(), r.inProvider, []string{pattern})
@@ -117,7 +124,10 @@ func CheckCondition(
 	}
 
 	if c.DirectoryExists != "" {
-		directoryName := substituteVars(c.DirectoryExists, env)
+		directoryName, err := envsub.EvalString(c.DirectoryExists, variables)
+		if err != nil {
+			return false, err
+		}
 		dirPath := path.Join(r.Component().Directory(), directoryName)
 		if stat, err := os.Stat(dirPath); err == nil && stat.IsDir() {
 			return true, nil
@@ -151,9 +161,11 @@ func CheckCondition(
 		// If "with_output" is set, the condition is met if the script output
 		// exactly matches the expected output.
 		if c.ScriptSucceeds.WithOutput != "" {
-			requiredOutput := substituteVars(c.ScriptSucceeds.WithOutput, env)
-			outputStr := strings.TrimSpace(outputBuffer.String())
-			return outputStr == requiredOutput, nil
+			requiredOutput, err := envsub.EvalString(c.ScriptSucceeds.WithOutput, variables)
+			if err != nil {
+				return false, err
+			}
+			return strings.TrimSpace(outputBuffer.String()) == requiredOutput, nil
 		}
 		return true, nil
 	}

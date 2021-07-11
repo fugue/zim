@@ -24,22 +24,22 @@ import (
 	"sync"
 
 	"github.com/fugue/zim/definitions"
-	"github.com/hashicorp/go-multierror"
 )
 
 // Project is a collection of Components that can be built and deployed
 type Project struct {
 	sync.Mutex
-	name            string
-	root            string
-	rootAbs         string
-	artifacts       string
-	cacheDir        string
-	components      []*Component
-	toolchain       map[string]string
-	providers       map[string]Provider
-	providerOptions map[string]map[string]interface{}
-	executor        Executor
+	name             string
+	root             string
+	rootAbs          string
+	artifacts        string
+	cacheDir         string
+	components       []*Component
+	componentsByName map[string]*Component
+	toolchain        map[string]string
+	providers        map[string]Provider
+	providerOptions  map[string]map[string]interface{}
+	executor         Executor
 }
 
 // Opts defines options used when initializing a Project
@@ -55,7 +55,7 @@ type Opts struct {
 func New(root string) (*Project, error) {
 	projDef, componentDefs, err := Discover(root)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to discover components: %s", err)
+		return nil, fmt.Errorf("failed to discover components: %s", err)
 	}
 	return NewWithOptions(Opts{
 		Root:          root,
@@ -70,13 +70,13 @@ func NewWithOptions(opts Opts) (*Project, error) {
 	root := opts.Root
 	rootAbs, err := filepath.Abs(root)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to resolve path %s: %s", root, err)
+		return nil, fmt.Errorf("failed to resolve path %s: %s", root, err)
 	}
 
 	// Create artifacts directory at the root level of the repository
 	artifacts := path.Join(rootAbs, "artifacts")
 	if err := os.MkdirAll(artifacts, 0755); err != nil {
-		return nil, fmt.Errorf("Failed to artifacts dir %s: %s",
+		return nil, fmt.Errorf("failed to artifacts dir %s: %s",
 			artifacts, err)
 	}
 
@@ -88,14 +88,15 @@ func NewWithOptions(opts Opts) (*Project, error) {
 	}
 
 	p := &Project{
-		root:            root,
-		rootAbs:         rootAbs,
-		artifacts:       artifacts,
-		cacheDir:        XDGCache(),
-		toolchain:       map[string]string{},
-		providers:       map[string]Provider{},
-		providerOptions: map[string]map[string]interface{}{},
-		executor:        executor,
+		root:             root,
+		rootAbs:          rootAbs,
+		artifacts:        artifacts,
+		cacheDir:         XDGCache(),
+		toolchain:        map[string]string{},
+		providers:        map[string]Provider{},
+		providerOptions:  map[string]map[string]interface{}{},
+		executor:         executor,
+		componentsByName: map[string]*Component{},
 	}
 
 	if opts.ProjectDef != nil {
@@ -118,24 +119,16 @@ func NewWithOptions(opts Opts) (*Project, error) {
 	for _, def := range opts.ComponentDefs {
 		component, err := NewComponent(p, def)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to load component %s: %s", def.Name, err)
+			return nil, fmt.Errorf("failed to load component %s: %s", def.Name, err)
 		}
+		componentName := component.Name()
+		if _, found := p.componentsByName[componentName]; found {
+			return nil, fmt.Errorf("duplicate component name: %s", componentName)
+		}
+		p.componentsByName[componentName] = component
 		p.components = append(p.components, component)
 	}
-
-	// Resolve dependencies between rules and return the project
-	return p, p.resolveDeps()
-}
-
-// resolveDeps processes dependencies between Rules
-func (p *Project) resolveDeps() error {
-	var result *multierror.Error
-	for _, c := range p.components {
-		if err := c.resolveDeps(); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-	return result.ErrorOrNil()
+	return p, nil
 }
 
 // Name of the project
@@ -196,7 +189,7 @@ func (p *Project) Select(names, kinds []string) (Components, error) {
 	// Check that all the selected component names are valid
 	for name := range selectedByName {
 		if found := availableByName[name]; !found {
-			return nil, fmt.Errorf("Unknown component: %s", name)
+			return nil, fmt.Errorf("unknown component: %s", name)
 		}
 	}
 	// Filter the set of components to ones that were selected
@@ -211,18 +204,18 @@ func (p *Project) Select(names, kinds []string) (Components, error) {
 
 // Resolve the dependency, returning the Rule it references
 func (p *Project) Resolve(dep *Dependency) (*Rule, error) {
-	component := p.Components().WithName(dep.Component).First()
-	if component == nil {
+	c, found := p.componentsByName[dep.Component]
+	if !found {
 		return nil, fmt.Errorf("unknown component: %s", dep.Component)
 	}
-	return component.Rule(dep.Rule, dep.Parameters)
+	return c.Rule(dep.Rule, dep.Parameters)
 }
 
 // Export returns the specified Export and a boolean indicating whether it was found
-func (p *Project) Export(component, exportName string) (*Export, bool) {
-	c := p.Components().WithName(component).First()
-	if c == nil {
-		return nil, false
+func (p *Project) Export(componentName, exportName string) (*Export, error) {
+	c, found := p.componentsByName[componentName]
+	if !found {
+		return nil, fmt.Errorf("unknown component: %s", componentName)
 	}
 	return c.Export(exportName)
 }
@@ -315,7 +308,7 @@ func (p *Project) Provider(name string) (Provider, error) {
 	case "docker":
 		provider, err = NewDocker()
 	default:
-		return nil, fmt.Errorf("Unknown provider: %s", name)
+		return nil, fmt.Errorf("unknown provider: %s", name)
 	}
 	if err != nil {
 		return nil, err

@@ -32,7 +32,7 @@ func TestNewComponentError(t *testing.T) {
 	if err == nil {
 		t.Fatal("Empty definitions should error")
 	}
-	if err.Error() != "Component definition path is empty" {
+	if err.Error() != "component definition path is empty" {
 		t.Fatal("Unexpected error:", err)
 	}
 }
@@ -104,10 +104,6 @@ func TestNewComponentRule(t *testing.T) {
 	require.NotNil(t, c)
 	rule, err := c.Rule("build")
 	require.Nil(t, err)
-
-	if !reflect.DeepEqual(c.Select([]string{"unknown", "build"}), []*Rule{rule}) {
-		t.Error("Expected build rule to be selected")
-	}
 	inputs, err := rule.Inputs()
 	require.Nil(t, err)
 

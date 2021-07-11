@@ -19,7 +19,6 @@ import (
 	"os"
 	"path"
 	"sort"
-	"strings"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -47,10 +46,8 @@ func XDGCache() string {
 func combineEnvironment(envs ...map[string]string) map[string]string {
 	result := map[string]string{}
 	for _, env := range envs {
-		if env != nil {
-			for k, v := range env {
-				result[k] = v
-			}
+		for k, v := range env {
+			result[k] = v
 		}
 	}
 	return result
@@ -77,48 +74,17 @@ func flattenEnvironment(env map[string]string) []string {
 
 func latestModification(files []string) (time.Time, error) {
 	if len(files) == 0 {
-		return time.Time{}, errors.New("No input files")
+		return time.Time{}, errors.New("no input files")
 	}
 	var latestMod time.Time
 	for _, fpath := range files {
 		info, err := os.Stat(fpath)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("Failed to stat %s: %s", fpath, err)
+			return time.Time{}, fmt.Errorf("failed to stat %s: %s", fpath, err)
 		}
 		if info.ModTime().After(latestMod) {
 			latestMod = info.ModTime()
 		}
 	}
 	return latestMod, nil
-}
-
-func substituteVarsSlice(strings []string, variables map[string]string) []string {
-	if len(strings) == 0 || len(variables) == 0 {
-		return strings
-	}
-	result := make([]string, len(strings))
-	for i, s := range strings {
-		result[i] = substituteVars(s, variables)
-	}
-	return result
-}
-
-func substituteVars(s string, variables map[string]string) string {
-	if s == "" || len(variables) == 0 {
-		return s
-	}
-	// ${NAME}.zip -> foo.zip
-	for k, v := range variables {
-		s = strings.ReplaceAll(s, fmt.Sprintf("${%s}", k), v)
-	}
-	return s
-}
-
-func copyStrings(input []string) []string {
-	if input == nil {
-		return nil
-	}
-	result := make([]string, len(input))
-	copy(result, input)
-	return result
 }

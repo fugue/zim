@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/envsub"
 )
 
 // Dependency on another Component (a Rule or an Export)
@@ -47,10 +48,7 @@ func NewCommands(self *definitions.Rule) (result []*Command, err error) {
 	}
 	// This form is used when the rule has a simple string for a command
 	if len(defCommands) == 0 {
-		result = []*Command{&Command{
-			Kind:     "run",
-			Argument: self.Command,
-		}}
+		result = []*Command{{Kind: "run", Argument: self.Command}}
 		return
 	}
 	// Otherwise, the rule has a series of commands
@@ -106,7 +104,7 @@ func NewRule(
 
 	commands, err := NewCommands(self)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create rule commands: %v", err)
+		return nil, fmt.Errorf("failed to create rule commands: %v", err)
 	}
 
 	r := &Rule{
@@ -140,17 +138,28 @@ func NewRule(
 
 	r.inProvider, err = c.Provider(self.Providers.Inputs)
 	if err != nil {
-		return nil, fmt.Errorf("Rule %s provider error: %s", r.NodeID(), err)
+		return nil, fmt.Errorf("rule %s provider error: %s", r.NodeID(), err)
 	}
 	r.outProvider, err = c.Provider(self.Providers.Outputs)
 	if err != nil {
-		return nil, fmt.Errorf("Rule %s provider error: %s", r.NodeID(), err)
+		return nil, fmt.Errorf("rule %s provider error: %s", r.NodeID(), err)
 	}
 
-	variables := r.BaseEnvironment()
-	r.inputs = substituteVarsSlice(r.inputs, variables)
-	r.ignore = substituteVarsSlice(r.ignore, variables)
-	r.outputs = substituteVarsSlice(r.outputs, variables)
+	variables := envsub.GenericMap(r.BaseEnvironment())
+
+	r.inputs, err = envsub.EvalStrings(r.inputs, variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate inputs: %w", err)
+	}
+	r.outputs, err = envsub.EvalStrings(r.outputs, variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate outputs: %w", err)
+	}
+	r.ignore, err = envsub.EvalStrings(r.ignore, variables)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate ignore: %w", err)
+	}
+
 	r.when = Condition{
 		ResourceExists:  self.When.ResourceExists,
 		DirectoryExists: self.When.DirectoryExists,
@@ -178,7 +187,7 @@ func (r *Rule) resolveDeps() error {
 	for _, dep := range r.requires {
 		// A Rule cannot depend on itself
 		if r.Component().Name() == dep.Component && r.Name() == dep.Rule {
-			return fmt.Errorf("Invalid dep - self reference: %s.%s",
+			return fmt.Errorf("invalid dependency - self reference: %s.%s",
 				dep.Component, dep.Rule)
 		}
 		// If the dependency is an Export, this Rule is using source exported
@@ -204,17 +213,16 @@ func (r *Rule) resolveDeps() error {
 // Accepts an export Dependency and returns the Export to which it refers.
 func (r *Rule) resolveExport(dep *Dependency) (*Export, error) {
 	if dep.Component == "" {
-		return nil, fmt.Errorf("Invalid dep in %s - component name empty",
+		return nil, fmt.Errorf("invalid dependency in %s: component name empty",
 			r.NodeID())
 	}
 	if dep.Component == r.Component().Name() {
-		return nil, fmt.Errorf("Invalid dep in %s - cannot import from self",
+		return nil, fmt.Errorf("invalid dependency in %s: cannot import from self",
 			r.NodeID())
 	}
-	export, found := r.Component().Project().Export(dep.Component, dep.Export)
-	if !found {
-		return nil, fmt.Errorf("Invalid dep in %s - export not found: %s.%s",
-			r.NodeID(), dep.Component, dep.Export)
+	export, err := r.Component().Project().Export(dep.Component, dep.Export)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dependency in %s: %w", r.NodeID(), err)
 	}
 	return export, nil
 }
@@ -286,8 +294,7 @@ func (r *Rule) Environment() (map[string]string, error) {
 		"DEP":     firstDep,
 		"DEPS":    strings.Join(relDeps, " "),
 	}
-	combined := combineEnvironment(r.BaseEnvironment(), tEnv)
-	return combined, nil
+	return combineEnvironment(r.BaseEnvironment(), tEnv), nil
 }
 
 // Project containing this Rule
@@ -377,9 +384,7 @@ func (r *Rule) OutputsExist() bool {
 // DependencyOutputs returns outputs of this Rule's dependencies
 func (r *Rule) DependencyOutputs() (outputs Resources) {
 	for _, dep := range r.Dependencies() {
-		for _, out := range dep.Outputs() {
-			outputs = append(outputs, out)
-		}
+		outputs = append(outputs, dep.Outputs()...)
 	}
 	return
 }
@@ -415,14 +420,14 @@ func (r *Rule) Inputs() (Resources, error) {
 	// Find input resources
 	inputs, err := matchResources(r.Component(), r.inProvider, r.inputs)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find input: %s", err)
+		return nil, fmt.Errorf("failed to find input: %s", err)
 	}
 	add(inputs)
 
 	// Exclude ignored resources
 	ignored, err := matchResources(r.Component(), r.inProvider, r.ignore)
 	if err != nil {
-		return nil, fmt.Errorf("Failed ignore: %s", err)
+		return nil, fmt.Errorf("failed ignore: %s", err)
 	}
 	ignore(ignored)
 
@@ -430,7 +435,7 @@ func (r *Rule) Inputs() (Resources, error) {
 	for _, imp := range r.resolvedImports {
 		imports, err := imp.Resolve()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find import: %s", err)
+			return nil, fmt.Errorf("failed to find import: %s", err)
 		}
 		add(imports)
 	}

@@ -2,6 +2,7 @@ package envsub
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/drone/envsubst"
 )
@@ -61,4 +62,41 @@ func Eval(
 		}
 	}
 	return
+}
+
+// EvalString performs variable substitution on the given string, using the
+// parameters as allowed values for substitution.
+func EvalString(input string, parameters map[string]interface{}) (string, error) {
+	if input == "" || !strings.Contains(input, "${") {
+		return input, nil
+	}
+	state := map[string]interface{}{}
+	parameters["__input__"] = input
+	if err := Eval(state, parameters); err != nil {
+		return "", err
+	}
+	return state["__input__"].(string), nil
+}
+
+// EvalStrings performs variable substitution on all the given strings, using
+// the parameters as allowed values for substitution.
+func EvalStrings(inputs []string, parameters map[string]interface{}) ([]string, error) {
+	results := make([]string, 0, len(inputs))
+	for _, input := range inputs {
+		result, err := EvalString(input, parameters)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
+// GenericMap transforms a string map to a map of interfaces
+func GenericMap(m map[string]string) map[string]interface{} {
+	result := map[string]interface{}{}
+	for k, v := range m {
+		result[k] = v
+	}
+	return result
 }

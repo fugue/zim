@@ -106,3 +106,13 @@ func TestEvalUnknownVariable(t *testing.T) {
 	require.NotNil(t, err)
 	require.Equal(t, "unknown variable: WHAT", err.Error())
 }
+
+func TestEvalString(t *testing.T) {
+	input := "Prefix ${NAME} ${FOO} Suffix"
+	result, err := EvalString(input, map[string]interface{}{
+		"FOO":  "FOO",
+		"NAME": "EAGLE",
+	})
+	require.Nil(t, err)
+	require.Equal(t, "Prefix EAGLE FOO Suffix", result)
+}

@@ -9,15 +9,6 @@ type Parameter struct {
 	Default     interface{} `yaml:"default"`
 }
 
-// func mergeParameters(a, b []Parameter) (result []Parameter) {
-// 	if b != nil {
-// 		result = append(result, b...)
-// 		return
-// 	}
-// 	result = append(result, a...)
-// 	return
-// }
-
 func mergeParameters(a, b map[string]Parameter) map[string]Parameter {
 	result := map[string]Parameter{}
 	for k, v := range a {
