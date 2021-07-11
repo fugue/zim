@@ -208,13 +208,22 @@ func (c *Component) Rule(
 	if len(optParameters) > 0 {
 		parameters = optParameters[0]
 	}
-
 	// Raise an error if unknown parameters were supplied
 	for paramName := range parameters {
 		if _, found := ruleDef.Parameters[paramName]; !found {
 			return nil, fmt.Errorf("unknown parameter for %s.%s: %s",
 				c.Name(), name, paramName)
 		}
+	}
+	// Build up state available to variable substitution
+	state := map[string]interface{}{
+		"COMPONENT": c.Name(),
+		"NAME":      c.Name(),
+		"KIND":      c.Kind(),
+		"RULE":      name,
+	}
+	for paramName, value := range parameters {
+		state[paramName] = value
 	}
 
 	// Resolve the value for each parameter
@@ -233,31 +242,23 @@ func (c *Component) Rule(
 			return nil, fmt.Errorf("incorrect parameter type for %s.%s %s: %w",
 				c.Name(), name, pName, err)
 		}
-	}
-
-	state := map[string]interface{}{
-		"COMPONENT": c.Name(),
-		"NAME":      c.Name(),
-		"KIND":      c.Kind(),
-		"RULE":      name,
-	}
-	builtIns := []string{"COMPONENT", "NAME", "KIND", "RULE"}
-
-	if err := envsub.Eval(state, values); err != nil {
-		return nil, fmt.Errorf("failed to evaluate rule parameters: %w", err)
-	}
-	for _, name := range builtIns {
-		delete(state, name)
+		if strValue, ok := values[pName].(string); ok {
+			subValue, err := envsub.EvalString(strValue, state)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve parameter %s in %s.%s: %w",
+					pName, c.Name(), name, err)
+			}
+			values[pName] = subValue
+		}
 	}
 
 	// Determine rule name including its parameters
-	fullName := RuleName(name, state)
+	fullName := RuleName(name, values)
 	rule, found := c.rules[fullName]
 	if found {
 		return rule, nil
 	}
-
-	rule, err := NewRule(name, fullName, state, c, &ruleDef)
+	rule, err := NewRule(name, fullName, values, c, &ruleDef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create rule instance: %w", err)
 	}

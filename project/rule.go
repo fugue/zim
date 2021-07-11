@@ -121,6 +121,7 @@ func NewRule(
 		requires:          make([]*Dependency, 0, len(self.Requires)),
 		parameters:        parameters,
 	}
+	variables := envsub.GenericMap(r.BaseEnvironment())
 
 	for _, dep := range self.Requires {
 		ruleDep := &Dependency{
@@ -133,6 +134,15 @@ func NewRule(
 		if ruleDep.Component == "" {
 			ruleDep.Component = c.Name()
 		}
+		for k, v := range ruleDep.Parameters {
+			if vStr, ok := v.(string); ok {
+				value, err := envsub.EvalString(vStr, variables)
+				if err != nil {
+					return nil, err
+				}
+				ruleDep.Parameters[k] = value
+			}
+		}
 		r.requires = append(r.requires, ruleDep)
 	}
 
@@ -144,8 +154,6 @@ func NewRule(
 	if err != nil {
 		return nil, fmt.Errorf("rule %s provider error: %s", r.NodeID(), err)
 	}
-
-	variables := envsub.GenericMap(r.BaseEnvironment())
 
 	r.inputs, err = envsub.EvalStrings(r.inputs, variables)
 	if err != nil {
