@@ -1,4 +1,4 @@
-# Proposal: Parameterized Rules
+# Proposal: Parameterized Rules and Dynamic Variables
 
 Rules may define parameters that are resolved at runtime. These parameters are
 then accessible in the rule definition and rule scripts, similar to how the
@@ -9,20 +9,24 @@ A mechanism is provided to resolve parameters from environment variables on the
 host machine, where the environment variable name may or may not be the same as
 the parameter name.
 
-## Approach
+A new `variables` section in the component definition supports more flexible
+variable resolution from the environment and from running scripts. Variables
+defined here may subsequently be referenced by rules, as default values for
+parameters as an example.
+
+## Thoughts
 
  * The resolved parameters factor into the rule identity and their cache key.
  * Users should have the option to "connect" a parameter to an environment
    variable on the host system.
  * Parameter values may also be passed explicitly via the "with" keyword as
    part of a requires statement.
- * Users should have the option to resolve parameters at the project level
-   and reuse the resolution across multiple components.
+ * Users should have the option to declare variables as global, so that they
+   are resolved only once across multiple components. Conflicting definitions
+   should result in an error or warning perhaps.
  * Extracting key-values from JSON environment variables could be helpful.
- * All environment variables should not be passed. Only those referenced as
-   parameters should be passed.
- * Variables defined by a script should be resolved immediately before first use.
- * A derived component should be able to override variable value defaults.
+ * Variables referenced by a rule should be resolved immediately before use.
+ * A derived component should be able to override parameter defaults.
  * Consider how conditional behavior should be introduced. Via a switch statement
    mechanism perhaps.
  * Parameters and their values should be shown to the user during execution by
