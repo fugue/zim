@@ -121,8 +121,8 @@ rules:
             --profile ${profile} \
             --kms-key-id ${kms_key_arn} \
             --s3-bucket ${s3_bucket} \
-		    --template-file ${INPUT} \
-		    --output-template-file ${OUTPUT}
+            --template-file ${INPUT} \
+            --output-template-file ${OUTPUT}
 
   deploy:
     native: true
