@@ -63,17 +63,17 @@ environment:
 # effectively the same as Makefile variables, which act as environment variables
 # when used in rules, and which may take on values from the host's shell.
 variables:
-  - name: KMS_KEY_ARN
+  KMS_KEY_ARN:
     run: ./key-retrieval-script.sh # Run a script to resolve the variable
     global: true                   # Cache this variable across components
-  - name: S3_BUCKET
+  S3_BUCKET:
     run: ./bucket-retrieval-script.sh
     global: true
-  - name: AWS_PROFILE
+  AWS_PROFILE:
     default: default              # Lowest precedence (if otherwise unspecified)
     env: AWS_PROFILE              # Higher precedence (if set in the environment)
-  - name: S3_BUCKET_COMMENT
-    value: The bucket is ${S3_BUCKET} # Example of referencing another variable
+  S3_BUCKET_COMMENT:
+    default: The bucket is ${S3_BUCKET} # Example of referencing another variable
 
 rules:
   build:
