@@ -63,7 +63,7 @@ type Component struct {
 	Toolchain   Toolchain         `yaml:"toolchain"`
 	Rules       map[string]Rule   `yaml:"rules"`
 	Exports     map[string]Export `yaml:"exports"`
-	Environment map[string]string `yaml:"environment"`
+	Environment interface{}       `yaml:"environment"`
 	Path        string
 }
 

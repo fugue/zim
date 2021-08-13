@@ -26,6 +26,17 @@ import (
 	"github.com/fugue/zim/definitions"
 )
 
+// Variable definition for creating a shell environment
+type Variable struct {
+	Definition string
+	Script     string
+}
+
+// Environment contains a list of variables used to define a shell environment
+type Environment struct {
+	Variables []*Variable
+}
+
 // Project is a collection of Components that can be built and deployed
 type Project struct {
 	sync.Mutex
@@ -40,6 +51,7 @@ type Project struct {
 	providers        map[string]Provider
 	providerOptions  map[string]map[string]interface{}
 	executor         Executor
+	environment      Environment
 }
 
 // Opts defines options used when initializing a Project
@@ -97,10 +109,21 @@ func NewWithOptions(opts Opts) (*Project, error) {
 		providerOptions:  map[string]map[string]interface{}{},
 		executor:         executor,
 		componentsByName: map[string]*Component{},
+		environment:      Environment{},
 	}
 
 	if opts.ProjectDef != nil {
 		p.name = opts.ProjectDef.Name
+		projectEnv, err := opts.ProjectDef.GetEnvironment()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get project environment: %w", err)
+		}
+		for _, variable := range projectEnv.Variables {
+			p.environment.Variables = append(p.environment.Variables, &Variable{
+				Definition: variable.Definition,
+				Script:     variable.Script,
+			})
+		}
 	}
 
 	for _, provider := range opts.Providers {
