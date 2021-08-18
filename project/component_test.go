@@ -20,6 +20,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fugue/zim/definitions"
@@ -138,12 +139,8 @@ func TestNewComponentRule(t *testing.T) {
 	if !found {
 		t.Fatal("Expected build rule to exist")
 	}
-	if !reflect.DeepEqual(c.Select([]string{"unknown", "build"}), []*Rule{rule}) {
-		t.Error("Expected build rule to be selected")
-	}
-	if !reflect.DeepEqual(c.Rules(), []*Rule{rule}) {
-		t.Error("Expected build rule to be present")
-	}
+	assert.Equal(t, c.Select([]string{"unknown", "build"}), []*Rule{rule})
+	assert.Equal(t, c.Rules(), []*Rule{rule})
 
 	inputs, err := rule.Inputs()
 	if err != nil {
