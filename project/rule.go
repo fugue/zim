@@ -44,10 +44,7 @@ func NewCommands(self *definitions.Rule) (result []*Command, err error) {
 	}
 	// This form is used when the rule has a simple string for a command
 	if len(defCommands) == 0 {
-		result = []*Command{&Command{
-			Kind:     "run",
-			Argument: self.Command,
-		}}
+		result = []*Command{{Kind: "run", Argument: self.Command}}
 		return
 	}
 	// Otherwise, the rule has a series of commands
@@ -87,7 +84,7 @@ func NewRule(name string, c *Component, self *definitions.Rule) (*Rule, error) {
 
 	commands, err := NewCommands(self)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create rule commands: %v", err)
+		return nil, fmt.Errorf("failed to create rule commands: %v", err)
 	}
 
 	r := &Rule{
@@ -152,7 +149,7 @@ func (r *Rule) resolveDeps() error {
 	for _, dep := range r.requires {
 		// A Rule cannot depend on itself
 		if r.Component().Name() == dep.Component && r.Name() == dep.Rule {
-			return fmt.Errorf("Invalid dep - self reference: %s.%s",
+			return fmt.Errorf("invalid dep - self reference: %s.%s",
 				dep.Component, dep.Rule)
 		}
 		// If the dependency is an Export, this Rule is using source exported
@@ -176,7 +173,7 @@ func (r *Rule) resolveDeps() error {
 		// This can be helpful when the immediate dependency doesn't actually
 		// fully encapsulate its own dependencies outputs.
 		if dep.Recurse > 1 {
-			return fmt.Errorf("Invalid dep - recursion: %s.%s",
+			return fmt.Errorf("invalid dep - recursion: %s.%s",
 				dep.Component, dep.Rule)
 		} else if dep.Recurse == 1 {
 			// Pull in transitive dependencies that are one step removed
@@ -195,16 +192,16 @@ func (r *Rule) resolveDeps() error {
 // Accepts an export Dependency and returns the Export to which it refers.
 func (r *Rule) resolveExport(dep *Dependency) (*Export, error) {
 	if dep.Component == "" {
-		return nil, fmt.Errorf("Invalid dep in %s - component name empty",
+		return nil, fmt.Errorf("invalid dep in %s - component name empty",
 			r.NodeID())
 	}
 	if dep.Component == r.Component().Name() {
-		return nil, fmt.Errorf("Invalid dep in %s - cannot import from self",
+		return nil, fmt.Errorf("invalid dep in %s - cannot import from self",
 			r.NodeID())
 	}
 	export, found := r.Component().Project().Export(dep.Component, dep.Export)
 	if !found {
-		return nil, fmt.Errorf("Invalid dep in %s - export not found: %s.%s",
+		return nil, fmt.Errorf("invalid dep in %s - export not found: %s.%s",
 			r.NodeID(), dep.Component, dep.Export)
 	}
 	return export, nil
@@ -224,7 +221,7 @@ func (r *Rule) resolveDep(dep *Dependency) (*Rule, error) {
 
 	depRule, found := r.Component().Project().Rule(depCompName, dep.Rule)
 	if !found {
-		return nil, fmt.Errorf("Invalid dep - rule not found: %s.%s",
+		return nil, fmt.Errorf("invalid dep - rule not found: %s.%s",
 			depCompName, dep.Rule)
 	}
 	return depRule, nil
@@ -373,9 +370,7 @@ func (r *Rule) OutputsExist() bool {
 // DependencyOutputs returns outputs of this Rule's dependencies
 func (r *Rule) DependencyOutputs() (outputs Resources) {
 	for _, dep := range r.Dependencies() {
-		for _, out := range dep.Outputs() {
-			outputs = append(outputs, out)
-		}
+		outputs = append(outputs, dep.Outputs()...)
 	}
 	return
 }
@@ -411,14 +406,14 @@ func (r *Rule) Inputs() (Resources, error) {
 	// Find input resources
 	inputs, err := matchResources(r.Component(), r.inProvider, r.inputs)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to find input: %s", err)
+		return nil, fmt.Errorf("failed to find input: %s", err)
 	}
 	add(inputs)
 
 	// Exclude ignored resources
 	ignored, err := matchResources(r.Component(), r.inProvider, r.ignore)
 	if err != nil {
-		return nil, fmt.Errorf("Failed ignore: %s", err)
+		return nil, fmt.Errorf("failed ignore: %s", err)
 	}
 	ignore(ignored)
 
@@ -426,7 +421,7 @@ func (r *Rule) Inputs() (Resources, error) {
 	for _, imp := range r.resolvedImports {
 		imports, err := imp.Resolve()
 		if err != nil {
-			return nil, fmt.Errorf("Failed to find import: %s", err)
+			return nil, fmt.Errorf("failed to find import: %s", err)
 		}
 		add(imports)
 	}

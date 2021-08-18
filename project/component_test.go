@@ -75,7 +75,7 @@ func TestNewComponentEmptyRule(t *testing.T) {
 	self := &definitions.Component{
 		Path: "/repo/foo/component.yaml",
 		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{},
+			"build": {},
 		},
 	}
 	c, _ := NewComponent(p, self)
@@ -119,7 +119,7 @@ func TestNewComponentRule(t *testing.T) {
 	self := &definitions.Component{
 		Path: cDefPath,
 		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{
+			"build": {
 				Description: "build it!",
 				Inputs:      []string{"${NAME}.go", "*.go", "go.mod"},
 				Ignore:      []string{"exclude_me.go"},

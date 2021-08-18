@@ -19,16 +19,9 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/fugue/zim/exec"
 	"github.com/hashicorp/go-multierror"
 )
-
-var cmdColor *color.Color
-
-func init() {
-	cmdColor = color.New(color.FgMagenta)
-}
 
 // RunOpts contains options used to configure the running of Rules
 type RunOpts struct {
@@ -93,7 +86,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Any scripting done to check the condition will be via the bash executor.
 	conditionsMet, err := CheckConditions(ctx, r, opts, bashExecutor, bashEnv)
 	if err != nil {
-		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
+		return Error, fmt.Errorf("error checking conditions on rule %s: %s", r.NodeID(), err)
 	}
 	if !conditionsMet {
 		return Skipped, nil
@@ -150,11 +143,11 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		case "copy":
 			execError = runner.execCopyCommand(ctx, r, exc, execOpts, cmd)
 		default:
-			return Error, fmt.Errorf("Unknown command kind in %s: %s",
+			return Error, fmt.Errorf("unknown command kind in %s: %s",
 				r.NodeID(), cmd.Kind)
 		}
 		if execError != nil {
-			return ExecError, fmt.Errorf("Error running rule command. Rule: %s. Command: %+v. Error: %s",
+			return ExecError, fmt.Errorf("error running rule command. Rule: %s. Command: %+v. Error: %s",
 				r.NodeID(), cmd, execError)
 		}
 	}
@@ -242,7 +235,7 @@ func (runner *StandardRunner) execZipCommand(
 	output := getCommandAttr(cmd, "output", "")
 	dir := getCommandAttr(cmd, "cd", "")
 	if output == "" {
-		return fmt.Errorf("Zip command has no output specified")
+		return fmt.Errorf("zip command has no output specified")
 	}
 	script := fmt.Sprintf("zip %s %s %s", opts, output, input)
 	if dir != "" {
@@ -264,7 +257,7 @@ func (runner *StandardRunner) execUnzipCommand(
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Unzip command has no input specified")
+		return fmt.Errorf("unzip command has no input specified")
 	}
 	script := fmt.Sprintf("unzip %s %s", opts, input)
 	if output != "" {
@@ -287,10 +280,10 @@ func (runner *StandardRunner) execArchiveCommand(
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Archive command has no input specified")
+		return fmt.Errorf("archive command has no input specified")
 	}
 	if output == "" {
-		return fmt.Errorf("Archive command has no output specified")
+		return fmt.Errorf("archive command has no output specified")
 	}
 	execOpts.Command = fmt.Sprintf("tar %s %s %s", opts, output, input)
 	return executor.Execute(ctx, execOpts)
@@ -309,7 +302,7 @@ func (runner *StandardRunner) execUnarchiveCommand(
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Archive command has no input specified")
+		return fmt.Errorf("archive command has no input specified")
 	}
 	script := fmt.Sprintf("tar %s %s", opts, input)
 	if output != "" {
@@ -383,10 +376,10 @@ func (runner *StandardRunner) execMoveCommand(
 	src := getCommandAttr(cmd, "src", "")
 	dst := getCommandAttr(cmd, "dst", "")
 	if src == "" {
-		return fmt.Errorf("Move command has no src specified")
+		return fmt.Errorf("move command has no src specified")
 	}
 	if dst == "" {
-		return fmt.Errorf("Move command has no dst specified")
+		return fmt.Errorf("move command has no dst specified")
 	}
 	execOpts.Command = fmt.Sprintf("mv %s %s", src, dst)
 	return executor.Execute(ctx, execOpts)
@@ -404,10 +397,10 @@ func (runner *StandardRunner) execCopyCommand(
 	dst := getCommandAttr(cmd, "dst", "")
 	opts := getCommandAttr(cmd, "options", "-R")
 	if src == "" {
-		return fmt.Errorf("Copy command has no src specified")
+		return fmt.Errorf("copy command has no src specified")
 	}
 	if dst == "" {
-		return fmt.Errorf("Copy command has no dst specified")
+		return fmt.Errorf("copy command has no dst specified")
 	}
 	args := fmt.Sprintf("%s %s", src, dst)
 	if opts != "" {

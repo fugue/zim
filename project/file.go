@@ -55,17 +55,17 @@ func (fs *FileSystem) Match(pattern string) (Resources, error) {
 			if os.IsNotExist(err) {
 				return Resources{}, nil
 			}
-			return nil, fmt.Errorf("Failed to stat input %s: %s",
+			return nil, fmt.Errorf("failed to stat input %s: %s",
 				pattern, err)
 		}
 		if matchInfo.IsDir() {
-			return nil, fmt.Errorf("Input cannot be a dir: %s", pattern)
+			return nil, fmt.Errorf("input cannot be a dir: %s", pattern)
 		}
 		return Resources{fs.New(match)}, nil
 	}
 	matches, err := MatchFiles(fs.root, pattern)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to match resources %s: %s", pattern, err)
+		return nil, fmt.Errorf("failed to match resources %s: %s", pattern, err)
 	}
 	rs := make(Resources, 0, len(matches))
 	for _, match := range matches {

@@ -71,7 +71,7 @@ func discoverDefs(root string) ([]string, error) {
 	}
 
 	if err := filepath.Walk(root, callback); err != nil {
-		return paths, fmt.Errorf("Failed to walk %s: %s", root, err)
+		return paths, fmt.Errorf("failed to walk %s: %s", root, err)
 	}
 	return paths, nil
 }
@@ -88,7 +88,7 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 	if fileExists(projectDefPath) {
 		pDef, err = definitions.LoadProjectFromPath(projectDefPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Invalid project.yaml: %s", err)
+			return nil, nil, fmt.Errorf("invalid project.yaml: %s", err)
 		}
 		if len(pDef.Components) > 0 {
 			componentPatterns = pDef.Components
@@ -108,9 +108,7 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 			if err != nil {
 				return nil, nil, err
 			}
-			for _, match := range matches {
-				paths = append(paths, match)
-			}
+			paths = append(paths, matches...)
 		}
 	}
 
@@ -128,10 +126,10 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 		defPath := path.Join(templateDir, info.Name())
 		def, err := definitions.LoadComponentFromPath(defPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Failed to load template %s: %s", defPath, err)
+			return nil, nil, fmt.Errorf("failed to load template %s: %s", defPath, err)
 		}
 		if def.Kind == "" {
-			return nil, nil, fmt.Errorf("Template kind unset: %s", defPath)
+			return nil, nil, fmt.Errorf("template kind unset: %s", defPath)
 		}
 		templates[def.Kind] = def
 	}
@@ -139,7 +137,7 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 	for _, defPath := range paths {
 		def, err := definitions.LoadComponentFromPath(defPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("Invalid component %s: %s", defPath, err)
+			return nil, nil, fmt.Errorf("invalid component %s: %s", defPath, err)
 		}
 		// Ignore components by request
 		if def.Ignore {
@@ -151,7 +149,7 @@ func Discover(root string) (*definitions.Project, []*definitions.Component, erro
 		}
 		// Disallow duplicate component names
 		if _, used := nameUsed[def.Name]; used {
-			return nil, nil, fmt.Errorf("Duplicate component name: %s", def.Name)
+			return nil, nil, fmt.Errorf("duplicate component name: %s", def.Name)
 		}
 		nameUsed[def.Name] = true
 		// Raise error if definition kind is unknown

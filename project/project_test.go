@@ -87,12 +87,12 @@ func TestNewProject(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "a",
 			Kind: "python",
 			Path: path.Join(dir, "a", "component.yaml"),
 		},
-		&definitions.Component{
+		{
 			Name: "b",
 			Kind: "go",
 			Path: path.Join(dir, "b", "component.yaml"),
@@ -133,12 +133,12 @@ func TestSelectComponents(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "a",
 			Kind: "python",
 			Path: path.Join(dir, "a", "component.yaml"),
 		},
-		&definitions.Component{
+		{
 			Name: "b",
 			Kind: "go",
 			Path: path.Join(dir, "b", "component.yaml"),
@@ -195,30 +195,25 @@ func TestResolveDeps(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	defs := []*definitions.Component{
-		&definitions.Component{
+		{
 			Name: "a",
 			Kind: "python",
 			Path: path.Join(dir, "a", "component.yaml"),
 			Rules: map[string]definitions.Rule{
-				"build": definitions.Rule{
+				"build": {
 					Description: "a-build",
 					Requires: []definitions.Dependency{
-						definitions.Dependency{
-							Component: "b",
-							Rule:      "build",
-						},
+						{Component: "b", Rule: "build"},
 					},
 				},
 			},
 		},
-		&definitions.Component{
+		{
 			Name: "b",
 			Kind: "go",
 			Path: path.Join(dir, "b", "component.yaml"),
 			Rules: map[string]definitions.Rule{
-				"build": definitions.Rule{
-					Description: "b-build",
-				},
+				"build": {Description: "b-build"},
 			},
 		},
 	}

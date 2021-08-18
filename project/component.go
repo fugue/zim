@@ -34,7 +34,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 	}
 	absPath, err := filepath.Abs(self.Path)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to resolve path: %s", err)
+		return nil, fmt.Errorf("failed to resolve path: %s", err)
 	}
 	componentDir := filepath.Dir(absPath)
 	name := self.Name
@@ -43,7 +43,7 @@ func NewComponent(p *Project, self *definitions.Component) (*Component, error) {
 	}
 	relPath, err := filepath.Rel(p.RootAbsPath(), componentDir)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to determine relative path: %s", err)
+		return nil, fmt.Errorf("failed to determine relative path: %s", err)
 	}
 
 	c := Component{
@@ -111,14 +111,11 @@ type Toolchain struct {
 type Component struct {
 	project      *Project
 	componentDir string
-	repoDir      string
 	relPath      string
-	artifactDir  string
 	name         string
 	app          string
 	kind         string
 	dockerImage  string
-	sources      []string
 	rules        map[string]*Rule
 	exports      map[string]*Export
 	env          map[string]string

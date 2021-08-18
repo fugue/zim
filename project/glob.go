@@ -26,7 +26,7 @@ import (
 func MatchFiles(dir, pattern string) ([]string, error) {
 	matches, err := glob.Glob(path.Join(dir, pattern))
 	if err != nil {
-		return nil, fmt.Errorf("Invalid source glob %s", pattern)
+		return nil, fmt.Errorf("invalid source glob %s", pattern)
 	}
 	// Filter out directories
 	results := make([]string, 0, len(matches))
