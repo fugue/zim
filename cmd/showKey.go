@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/fugue/zim/cache"
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -57,11 +58,11 @@ func NewShowKeyCommand() *cobra.Command {
 			}
 			componentName = opts.Components[0]
 
-			var executor project.Executor
+			var executor exec.Executor
 			if opts.UseDocker {
-				executor = project.NewDockerExecutor(opts.Directory)
+				executor = exec.NewDockerExecutor(opts.Directory)
 			} else {
-				executor = project.NewBashExecutor()
+				executor = exec.NewBashExecutor()
 			}
 
 			projDef, componentDefs, err := project.Discover(opts.Directory)

@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -39,7 +40,7 @@ type Project struct {
 	toolchain       map[string]string
 	providers       map[string]Provider
 	providerOptions map[string]map[string]interface{}
-	executor        Executor
+	executor        exec.Executor
 }
 
 // Opts defines options used when initializing a Project
@@ -48,7 +49,7 @@ type Opts struct {
 	ProjectDef    *definitions.Project
 	ComponentDefs []*definitions.Component
 	Providers     []Provider
-	Executor      Executor
+	Executor      exec.Executor
 }
 
 // New returns a Project that resides at the given root directory
@@ -80,18 +81,18 @@ func NewWithOptions(opts Opts) (*Project, error) {
 			artifacts, err)
 	}
 
-	var executor Executor
+	var executor exec.Executor
 	if opts.Executor != nil {
 		executor = opts.Executor
 	} else {
-		executor = NewBashExecutor()
+		executor = exec.NewBashExecutor()
 	}
 
 	p := &Project{
 		root:            root,
 		rootAbs:         rootAbs,
 		artifacts:       artifacts,
-		cacheDir:        XDGCache(),
+		cacheDir:        exec.XDGCache(),
 		toolchain:       map[string]string{},
 		providers:       map[string]Provider{},
 		providerOptions: map[string]map[string]interface{}{},
@@ -241,7 +242,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 
 	// Get an appropriate executor for the Component in terms of whether it is
 	// Docker enabled. Use the Project executor by default, if it is compatible.
-	var executor Executor
+	var executor exec.Executor
 	if c.dockerImage != "" {
 		// Component is Docker-enabled
 		if !p.executor.UsesDocker() {
@@ -251,7 +252,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 	} else {
 		// Component is not using Docker
 		if p.executor.UsesDocker() {
-			executor = NewBashExecutor()
+			executor = exec.NewBashExecutor()
 		} else {
 			executor = p.executor
 		}
@@ -274,7 +275,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 		}
 		buf := bytes.Buffer{}
 		ignore := bytes.Buffer{}
-		if err := executor.Execute(ctx, ExecOpts{
+		if err := executor.Execute(ctx, exec.ExecOpts{
 			Image:   c.dockerImage,
 			Command: item.Command,
 			Stdout:  &buf,

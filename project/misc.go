@@ -17,7 +17,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -29,19 +28,6 @@ import (
 func UUID() string {
 	id := uuid.NewV4()
 	return id.String()
-}
-
-// XDGCache returns the local cache directory
-func XDGCache() string {
-	value := os.Getenv("XDG_CACHE_HOME")
-	if value != "" {
-		return value
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return path.Join(home, ".cache")
 }
 
 func combineEnvironment(envs ...map[string]string) map[string]string {

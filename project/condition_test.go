@@ -21,6 +21,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/fugue/zim/exec"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +43,7 @@ func TestRuleCondition(t *testing.T) {
 	require.Equal(t, "conditions-test", comp.Name())
 
 	var stdout bytes.Buffer
-	executor := NewBashExecutor()
+	executor := exec.NewBashExecutor()
 	execOpts := RunOpts{
 		Output:      &stdout,
 		DebugOutput: &stdout,
@@ -85,7 +86,7 @@ func TestConditionScript(t *testing.T) {
 	dir := testDir()
 	defer os.RemoveAll(dir)
 	ctx := context.Background()
-	executor := NewBashExecutor()
+	executor := exec.NewBashExecutor()
 	env := map[string]string{}
 
 	c := &Component{name: "test-comp", componentDir: dir}
@@ -185,7 +186,7 @@ func TestExistsConditions(t *testing.T) {
 	subDir := path.Base(testDir(componentDir))
 
 	ctx := context.Background()
-	executor := NewBashExecutor()
+	executor := exec.NewBashExecutor()
 
 	fs, err := NewFileSystem(root)
 	if err != nil {

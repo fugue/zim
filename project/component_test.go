@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 )
 
 func TestNewComponentError(t *testing.T) {
@@ -255,7 +256,7 @@ func TestComponentToolchain(t *testing.T) {
 		root:      dir,
 		rootAbs:   dir,
 		toolchain: map[string]string{},
-		executor:  NewBashExecutor(),
+		executor:  exec.NewBashExecutor(),
 	}
 	self := &definitions.Component{
 		Path: cDefPath,

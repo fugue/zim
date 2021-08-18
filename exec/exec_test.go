@@ -11,17 +11,31 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package project
+
+package exec
 
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 )
+
+func testDir(parent ...string) string {
+	p := "/tmp"
+	if len(parent) > 0 {
+		p = parent[0]
+	}
+	dir, err := ioutil.TempDir(p, "zim-")
+	if err != nil {
+		panic(err)
+	}
+	return dir
+}
 
 func TestBashExecutor(t *testing.T) {
 

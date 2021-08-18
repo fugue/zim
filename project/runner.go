@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/fugue/zim/exec"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -32,7 +33,7 @@ func init() {
 // RunOpts contains options used to configure the running of Rules
 type RunOpts struct {
 	BuildID     string
-	Executor    Executor
+	Executor    exec.Executor
 	Output      io.Writer
 	DebugOutput io.Writer
 	Debug       bool
@@ -63,16 +64,16 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 
 	// Get a plain bash executor: either the provided one, or a newly created
 	// one if the provided one is dockerized.
-	var bashExecutor Executor
+	var bashExecutor exec.Executor
 	if opts.Executor != nil && !opts.Executor.UsesDocker() {
 		bashExecutor = opts.Executor
 	} else {
-		bashExecutor = NewBashExecutor()
+		bashExecutor = exec.NewBashExecutor()
 	}
 
 	// Determine the primary executor to be used for "run" commands.
 	// Use the provided one unless it conflicts in terms of native vs. docker.
-	var primaryExecutor Executor
+	var primaryExecutor exec.Executor
 	if opts.Executor == nil || (r.IsNative() && opts.Executor.UsesDocker()) {
 		primaryExecutor = bashExecutor
 	} else {
@@ -109,13 +110,13 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Execute each of the rule's commands
 	for i, cmd := range r.Commands() {
 		env := bashEnv
-		exec := bashExecutor
+		exc := bashExecutor
 		if cmd.Kind == "run" {
 			// Run commands use the primary environment and executor
 			env = primaryEnv
-			exec = primaryExecutor
+			exc = primaryExecutor
 		}
-		execOpts := ExecOpts{
+		execOpts := exec.ExecOpts{
 			WorkingDirectory: r.Component().Directory(),
 			Env:              flattenEnvironment(env),
 			Stdout:           opts.Output,
@@ -129,25 +130,25 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		var execError error
 		switch cmd.Kind {
 		case "run":
-			execError = runner.execRunCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execRunCommand(ctx, r, exc, execOpts, cmd)
 		case "zip":
-			execError = runner.execZipCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execZipCommand(ctx, r, exc, execOpts, cmd)
 		case "unzip":
-			execError = runner.execUnzipCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execUnzipCommand(ctx, r, exc, execOpts, cmd)
 		case "archive":
-			execError = runner.execArchiveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execArchiveCommand(ctx, r, exc, execOpts, cmd)
 		case "unarchive":
-			execError = runner.execUnarchiveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execUnarchiveCommand(ctx, r, exc, execOpts, cmd)
 		case "mkdir":
-			execError = runner.execMkdirCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execMkdirCommand(ctx, r, exc, execOpts, cmd)
 		case "cleandir":
-			execError = runner.execCleandirCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execCleandirCommand(ctx, r, exc, execOpts, cmd)
 		case "remove":
-			execError = runner.execRemoveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execRemoveCommand(ctx, r, exc, execOpts, cmd)
 		case "move":
-			execError = runner.execMoveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execMoveCommand(ctx, r, exc, execOpts, cmd)
 		case "copy":
-			execError = runner.execCopyCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execCopyCommand(ctx, r, exc, execOpts, cmd)
 		default:
 			return Error, fmt.Errorf("Unknown command kind in %s: %s",
 				r.NodeID(), cmd.Kind)
@@ -178,7 +179,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 // the path within the Docker container, if Docker is being used.
 func (runner *StandardRunner) setArtifactVariables(
 	r *Rule,
-	executor Executor,
+	executor exec.Executor,
 	env map[string]string,
 ) error {
 	// Absolute path to the root of the project
@@ -214,8 +215,8 @@ func (runner *StandardRunner) setArtifactVariables(
 func (runner *StandardRunner) execRunCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	script := strings.TrimSpace(cmd.Argument)
@@ -232,8 +233,8 @@ func (runner *StandardRunner) execRunCommand(
 func (runner *StandardRunner) execZipCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-qrFS")
@@ -255,8 +256,8 @@ func (runner *StandardRunner) execZipCommand(
 func (runner *StandardRunner) execUnzipCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-qo")
@@ -278,8 +279,8 @@ func (runner *StandardRunner) execUnzipCommand(
 func (runner *StandardRunner) execArchiveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-czf")
@@ -300,8 +301,8 @@ func (runner *StandardRunner) execArchiveCommand(
 func (runner *StandardRunner) execUnarchiveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-xzf")
@@ -322,8 +323,8 @@ func (runner *StandardRunner) execUnarchiveCommand(
 func (runner *StandardRunner) execMkdirCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -340,8 +341,8 @@ func (runner *StandardRunner) execMkdirCommand(
 func (runner *StandardRunner) execCleandirCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -359,8 +360,8 @@ func (runner *StandardRunner) execCleandirCommand(
 func (runner *StandardRunner) execRemoveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -375,8 +376,8 @@ func (runner *StandardRunner) execRemoveCommand(
 func (runner *StandardRunner) execMoveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	src := getCommandAttr(cmd, "src", "")
@@ -395,8 +396,8 @@ func (runner *StandardRunner) execMoveCommand(
 func (runner *StandardRunner) execCopyCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	src := getCommandAttr(cmd, "src", "")

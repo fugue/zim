@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,7 +40,7 @@ func testDir() string {
 func TestWorker(t *testing.T) {
 
 	ctx := context.Background()
-	executor := project.NewBashExecutor()
+	executor := exec.NewBashExecutor()
 	ruleChan := make(chan *project.Rule, 1)
 	resultChan := make(chan *workerResult, 1)
 

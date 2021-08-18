@@ -20,6 +20,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/fugue/zim/exec"
 )
 
 // ConditionScript defines a shell script to run for a Condition check
@@ -62,7 +64,7 @@ func CheckConditions(
 	ctx context.Context,
 	r *Rule,
 	opts RunOpts,
-	executor Executor,
+	executor exec.Executor,
 	env map[string]string,
 ) (bool, error) {
 
@@ -101,7 +103,7 @@ func CheckCondition(
 	r *Rule,
 	c Condition,
 	opts RunOpts,
-	executor Executor,
+	executor exec.Executor,
 	env map[string]string,
 ) (bool, error) {
 
@@ -129,7 +131,7 @@ func CheckCondition(
 		var outputBuffer bytes.Buffer
 		// The "script succeeds" condition evaluates to true if the specified shell
 		// command exits without error when run in bash
-		err := executor.Execute(ctx, ExecOpts{
+		err := executor.Execute(ctx, exec.ExecOpts{
 			Command:          c.ScriptSucceeds.Run,
 			WorkingDirectory: r.Component().Directory(),
 			Env:              flattenEnvironment(env),
