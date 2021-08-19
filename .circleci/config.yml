@@ -2,7 +2,7 @@ version: 2.1
 jobs:
   unit_tests:
     docker:
-      - image: circleci/golang:1.12.4
+      - image: circleci/golang:1.16.7
     steps:
       - checkout
       - run:
