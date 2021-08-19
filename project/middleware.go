@@ -62,7 +62,7 @@ func Logger(runner Runner) Runner {
 			return code, err
 		}
 
-		duration := time.Now().Sub(startedAt)
+		duration := time.Since(startedAt)
 		durationStr := fmt.Sprintf("in %.3f sec", duration.Seconds())
 
 		if err != nil {

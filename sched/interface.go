@@ -16,6 +16,7 @@ package sched
 import (
 	"context"
 
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 )
 
@@ -24,7 +25,7 @@ type Options struct {
 	BuildID    string
 	Name       string
 	Runner     project.Runner
-	Executor   project.Executor
+	Executor   exec.Executor
 	Rules      []*project.Rule
 	RunRemote  bool
 	NumWorkers int

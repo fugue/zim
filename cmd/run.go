@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/fugue/zim/cache"
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 	"github.com/fugue/zim/sched"
 	"github.com/fugue/zim/store"
@@ -69,11 +70,11 @@ func NewRunCommand() *cobra.Command {
 				opts.Jobs = 1
 			}
 
-			var executor project.Executor
+			var executor exec.Executor
 			if opts.UseDocker {
-				executor = project.NewDockerExecutor(opts.Directory)
+				executor = exec.NewDockerExecutor(opts.Directory)
 			} else {
-				executor = project.NewBashExecutor()
+				executor = exec.NewBashExecutor()
 			}
 
 			projDef, componentDefs, err := project.Discover(opts.Directory)

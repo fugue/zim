@@ -173,7 +173,7 @@ func TestRuleMissingDepOutputs(t *testing.T) {
 
 	_, err := New(dir)
 	require.NotNil(t, err)
-	assert.Contains(t, err.Error(), "Invalid dep - rule not found: foo.build")
+	assert.Contains(t, err.Error(), "invalid dep - rule not found: foo.build")
 }
 
 func TestRuleOutputs(t *testing.T) {

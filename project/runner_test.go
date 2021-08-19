@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
@@ -87,19 +88,19 @@ func TestStandardRunner(t *testing.T) {
 	buf := bytes.Buffer{}
 	var writer io.Writer = &buf
 
-	m := NewMockExecutor(ctrl)
+	m := exec.NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().AnyTimes()
 	m.EXPECT().ExecutorPath(gomock.Any()).DoAndReturn(func(in string) (string, error) {
 		return in, nil
 	}).AnyTimes()
-	m.EXPECT().Execute(ctx, ExecOpts{
+	m.EXPECT().Execute(ctx, exec.ExecOpts{
 		Name:             "a.build.0",
 		Command:          "ls ${NAME}",
 		WorkingDirectory: cDir,
 		Env:              expectedEnv,
 		Stdout:           writer,
 		Stderr:           writer,
-	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+	}).DoAndReturn(func(ctx context.Context, opts exec.ExecOpts) error {
 		// Create output artifact as if the build happened
 		artifact := path.Join(dir, "artifacts", "myartifact")
 		return ioutil.WriteFile(artifact, []byte{}, 0644)
@@ -195,12 +196,12 @@ func TestStandardRunnerDockerized(t *testing.T) {
 	buf := bytes.Buffer{}
 	var writer io.Writer = &buf
 
-	m := NewMockExecutor(ctrl)
+	m := exec.NewMockExecutor(ctrl)
 	m.EXPECT().UsesDocker().Return(true).AnyTimes()
 	m.EXPECT().ExecutorPath(dir).Return(dir, nil)
 	m.EXPECT().ExecutorPath(rule.ArtifactsDir()).Return(artifactsDir, nil)
 
-	m.EXPECT().Execute(ctx, ExecOpts{
+	m.EXPECT().Execute(ctx, exec.ExecOpts{
 		Name:             "widget.twist-it.0",
 		Command:          "echo TWIST IT",
 		Image:            "go:123",
@@ -208,11 +209,11 @@ func TestStandardRunnerDockerized(t *testing.T) {
 		Env:              expectedEnv,
 		Stdout:           writer,
 		Stderr:           writer,
-	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+	}).DoAndReturn(func(ctx context.Context, opts exec.ExecOpts) error {
 		return nil
 	})
 
-	m.EXPECT().Execute(ctx, ExecOpts{
+	m.EXPECT().Execute(ctx, exec.ExecOpts{
 		Name:             "widget.twist-it.1",
 		Command:          "echo BOP IT",
 		Image:            "go:123",
@@ -220,7 +221,7 @@ func TestStandardRunnerDockerized(t *testing.T) {
 		Env:              expectedEnv,
 		Stdout:           writer,
 		Stderr:           writer,
-	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+	}).DoAndReturn(func(ctx context.Context, opts exec.ExecOpts) error {
 		return nil
 	})
 
@@ -273,7 +274,7 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	m := NewMockExecutor(ctrl)
+	m := exec.NewMockExecutor(ctrl)
 
 	expectedEnv := flattenEnvironment(map[string]string{
 		"COMPONENT":     "widget",
@@ -293,7 +294,7 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 	m.EXPECT().ExecutorPath(dir).Return("/path/to/root", nil)
 	m.EXPECT().ExecutorPath(artifactsDir).Return("/path/to/artifacts", nil)
 	m.EXPECT().UsesDocker().Return(false).AnyTimes()
-	m.EXPECT().Execute(ctx, ExecOpts{
+	m.EXPECT().Execute(ctx, exec.ExecOpts{
 		Command:          "exit 1",
 		WorkingDirectory: cDir,
 		Env:              expectedEnv,
@@ -301,7 +302,7 @@ func TestStandardRunnerWhenCondition(t *testing.T) {
 		Name:             "widget.twist-it.condition",
 		Stdout:           &outputBuffer,
 		Stderr:           &outputBuffer,
-	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+	}).DoAndReturn(func(ctx context.Context, opts exec.ExecOpts) error {
 		return errors.New("Exiting with 1")
 	})
 
@@ -353,7 +354,7 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	ctx := context.Background()
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	m := NewMockExecutor(ctrl)
+	m := exec.NewMockExecutor(ctrl)
 
 	expectedEnv := flattenEnvironment(map[string]string{
 		"COMPONENT":     "widget",
@@ -373,7 +374,7 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 	m.EXPECT().UsesDocker().Return(false).AnyTimes()
 	m.EXPECT().ExecutorPath(dir).Return("/path/to/root", nil)
 	m.EXPECT().ExecutorPath(artifactsDir).Return("/path/to/artifacts", nil)
-	m.EXPECT().Execute(ctx, ExecOpts{
+	m.EXPECT().Execute(ctx, exec.ExecOpts{
 		Command:          "exit 0",
 		WorkingDirectory: cDir,
 		Env:              expectedEnv,
@@ -381,7 +382,7 @@ func TestStandardRunnerUnlessCondition(t *testing.T) {
 		Name:             "widget.twist-it.condition",
 		Stdout:           &outputBuffer,
 		Stderr:           &outputBuffer,
-	}).DoAndReturn(func(ctx context.Context, opts ExecOpts) error {
+	}).DoAndReturn(func(ctx context.Context, opts exec.ExecOpts) error {
 		// Return nil corresponds to running a script that exits without error
 		return nil
 	})
@@ -401,7 +402,7 @@ func TestRunnerBuiltIns(t *testing.T) {
 	dir := testDir()
 	defer os.RemoveAll(dir)
 	ctx := context.Background()
-	executor := NewBashExecutor()
+	executor := exec.NewBashExecutor()
 	runner := &StandardRunner{}
 
 	testComponentFile(dir, "main.go", "package main")
@@ -583,7 +584,7 @@ func TestEmptyCommand(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	executor := NewMockExecutor(ctrl)
+	executor := exec.NewMockExecutor(ctrl)
 	executor.EXPECT().UsesDocker().Return(false).AnyTimes()
 	executor.EXPECT().ExecutorPath(gomock.Any()).AnyTimes()
 	// Note: Execute is NOT called!

@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package project
 
 import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"strings"
 	"time"
@@ -31,26 +31,11 @@ func UUID() string {
 	return id.String()
 }
 
-// XDGCache returns the local cache directory
-func XDGCache() string {
-	value := os.Getenv("XDG_CACHE_HOME")
-	if value != "" {
-		return value
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
-	return path.Join(home, ".cache")
-}
-
 func combineEnvironment(envs ...map[string]string) map[string]string {
 	result := map[string]string{}
 	for _, env := range envs {
-		if env != nil {
-			for k, v := range env {
-				result[k] = v
-			}
+		for k, v := range env {
+			result[k] = v
 		}
 	}
 	return result
@@ -77,13 +62,13 @@ func flattenEnvironment(env map[string]string) []string {
 
 func latestModification(files []string) (time.Time, error) {
 	if len(files) == 0 {
-		return time.Time{}, errors.New("No input files")
+		return time.Time{}, errors.New("no input files")
 	}
 	var latestMod time.Time
 	for _, fpath := range files {
 		info, err := os.Stat(fpath)
 		if err != nil {
-			return time.Time{}, fmt.Errorf("Failed to stat %s: %s", fpath, err)
+			return time.Time{}, fmt.Errorf("failed to stat %s: %s", fpath, err)
 		}
 		if info.ModTime().After(latestMod) {
 			latestMod = info.ModTime()
@@ -112,13 +97,4 @@ func substituteVars(s string, variables map[string]string) string {
 		s = strings.ReplaceAll(s, fmt.Sprintf("${%s}", k), v)
 	}
 	return s
-}
-
-func copyStrings(input []string) []string {
-	if input == nil {
-		return nil
-	}
-	result := make([]string, len(input))
-	copy(result, input)
-	return result
 }

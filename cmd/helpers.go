@@ -14,12 +14,14 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 
-	"github.com/fugue/zim/git"
 	"github.com/fugue/zim/project"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,8 +36,7 @@ func getRepository(dir string) (string, error) {
 	if dir == "" {
 		dir = "."
 	}
-	repo, err := git.RepoRoot(dir)
-	return repo, err
+	return repoRoot(dir)
 }
 
 func gitRoot(dir string) (string, error) {
@@ -123,4 +124,25 @@ func fileExists(p string) bool {
 		return true
 	}
 	return false
+}
+
+// repoRoot returns the root directory of the Git repository, given any
+// path within the repository
+func repoRoot(dir string) (string, error) {
+
+	var b bytes.Buffer
+	args := []string{"rev-parse", "--git-dir"}
+	command := exec.Command("git", args...)
+	command.Dir = dir
+	command.Stdout = &b
+	command.Stderr = &b
+
+	if err := command.Run(); err != nil {
+		return "", fmt.Errorf("Failed to run git rev-parse: %s", err)
+	}
+	output := strings.TrimSpace(b.String())
+	if output == ".git" {
+		return dir, nil
+	}
+	return filepath.Dir(output), nil
 }

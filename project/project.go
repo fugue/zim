@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 	"github.com/hashicorp/go-multierror"
 )
 
@@ -39,7 +40,7 @@ type Project struct {
 	toolchain       map[string]string
 	providers       map[string]Provider
 	providerOptions map[string]map[string]interface{}
-	executor        Executor
+	executor        exec.Executor
 }
 
 // Opts defines options used when initializing a Project
@@ -48,14 +49,14 @@ type Opts struct {
 	ProjectDef    *definitions.Project
 	ComponentDefs []*definitions.Component
 	Providers     []Provider
-	Executor      Executor
+	Executor      exec.Executor
 }
 
 // New returns a Project that resides at the given root directory
 func New(root string) (*Project, error) {
 	projDef, componentDefs, err := Discover(root)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to discover components: %s", err)
+		return nil, fmt.Errorf("failed to discover components: %s", err)
 	}
 	return NewWithOptions(Opts{
 		Root:          root,
@@ -70,28 +71,28 @@ func NewWithOptions(opts Opts) (*Project, error) {
 	root := opts.Root
 	rootAbs, err := filepath.Abs(root)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to resolve path %s: %s", root, err)
+		return nil, fmt.Errorf("failed to resolve path %s: %s", root, err)
 	}
 
 	// Create artifacts directory at the root level of the repository
 	artifacts := path.Join(rootAbs, "artifacts")
 	if err := os.MkdirAll(artifacts, 0755); err != nil {
-		return nil, fmt.Errorf("Failed to artifacts dir %s: %s",
+		return nil, fmt.Errorf("failed to artifacts dir %s: %s",
 			artifacts, err)
 	}
 
-	var executor Executor
+	var executor exec.Executor
 	if opts.Executor != nil {
 		executor = opts.Executor
 	} else {
-		executor = NewBashExecutor()
+		executor = exec.NewBashExecutor()
 	}
 
 	p := &Project{
 		root:            root,
 		rootAbs:         rootAbs,
 		artifacts:       artifacts,
-		cacheDir:        XDGCache(),
+		cacheDir:        exec.XDGCache(),
 		toolchain:       map[string]string{},
 		providers:       map[string]Provider{},
 		providerOptions: map[string]map[string]interface{}{},
@@ -118,7 +119,7 @@ func NewWithOptions(opts Opts) (*Project, error) {
 	for _, def := range opts.ComponentDefs {
 		component, err := NewComponent(p, def)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to load component %s: %s", def.Name, err)
+			return nil, fmt.Errorf("failed to load component %s: %s", def.Name, err)
 		}
 		p.components = append(p.components, component)
 	}
@@ -196,7 +197,7 @@ func (p *Project) Select(names, kinds []string) (Components, error) {
 	// Check that all the selected component names are valid
 	for name := range selectedByName {
 		if found := availableByName[name]; !found {
-			return nil, fmt.Errorf("Unknown component: %s", name)
+			return nil, fmt.Errorf("unknown component: %s", name)
 		}
 	}
 	// Filter the set of components to ones that were selected
@@ -241,7 +242,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 
 	// Get an appropriate executor for the Component in terms of whether it is
 	// Docker enabled. Use the Project executor by default, if it is compatible.
-	var executor Executor
+	var executor exec.Executor
 	if c.dockerImage != "" {
 		// Component is Docker-enabled
 		if !p.executor.UsesDocker() {
@@ -251,7 +252,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 	} else {
 		// Component is not using Docker
 		if p.executor.UsesDocker() {
-			executor = NewBashExecutor()
+			executor = exec.NewBashExecutor()
 		} else {
 			executor = p.executor
 		}
@@ -274,7 +275,7 @@ func (p *Project) Toolchain(c *Component) (map[string]string, error) {
 		}
 		buf := bytes.Buffer{}
 		ignore := bytes.Buffer{}
-		if err := executor.Execute(ctx, ExecOpts{
+		if err := executor.Execute(ctx, exec.ExecOpts{
 			Image:   c.dockerImage,
 			Command: item.Command,
 			Stdout:  &buf,
@@ -312,10 +313,8 @@ func (p *Project) Provider(name string) (Provider, error) {
 	switch name {
 	case "file":
 		provider, err = NewFileSystem(p.rootAbs)
-	case "docker":
-		provider, err = NewDocker()
 	default:
-		return nil, fmt.Errorf("Unknown provider: %s", name)
+		return nil, fmt.Errorf("unknown provider: %s", name)
 	}
 	if err != nil {
 		return nil, err

@@ -25,8 +25,8 @@ func TestSimpleRuleGraph(t *testing.T) {
 	c := &Component{name: "foo"}
 
 	rules := []*Rule{
-		&Rule{component: c, name: "build"},
-		&Rule{component: c, name: "test"},
+		{component: c, name: "build"},
+		{component: c, name: "test"},
 	}
 
 	g := GraphFromRules(rules)
@@ -47,8 +47,8 @@ func TestConnectedRuleGraph(t *testing.T) {
 	c := &Component{name: "foo"}
 
 	rules := []*Rule{
-		&Rule{component: c, name: "build"},
-		&Rule{component: c, name: "test"},
+		{component: c, name: "build"},
+		{component: c, name: "test"},
 	}
 	// Make "build" depend on "test"
 	rules[0].resolvedDeps = []*Rule{rules[1]}

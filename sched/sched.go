@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/graph"
 	"github.com/fugue/zim/project"
 	"github.com/hashicorp/go-multierror"
@@ -62,7 +63,7 @@ func (s *dagScheduler) Run(ctx context.Context, opts Options) error {
 
 	executor := opts.Executor
 	if executor == nil {
-		executor = project.NewBashExecutor()
+		executor = exec.NewBashExecutor()
 	}
 
 	// Run the specified number of workers to run rules in parallel

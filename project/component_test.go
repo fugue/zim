@@ -20,9 +20,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fugue/zim/definitions"
+	"github.com/fugue/zim/exec"
 )
 
 func TestNewComponentError(t *testing.T) {
@@ -74,7 +76,7 @@ func TestNewComponentEmptyRule(t *testing.T) {
 	self := &definitions.Component{
 		Path: "/repo/foo/component.yaml",
 		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{},
+			"build": {},
 		},
 	}
 	c, _ := NewComponent(p, self)
@@ -118,7 +120,7 @@ func TestNewComponentRule(t *testing.T) {
 	self := &definitions.Component{
 		Path: cDefPath,
 		Rules: map[string]definitions.Rule{
-			"build": definitions.Rule{
+			"build": {
 				Description: "build it!",
 				Inputs:      []string{"${NAME}.go", "*.go", "go.mod"},
 				Ignore:      []string{"exclude_me.go"},
@@ -137,12 +139,8 @@ func TestNewComponentRule(t *testing.T) {
 	if !found {
 		t.Fatal("Expected build rule to exist")
 	}
-	if !reflect.DeepEqual(c.Select([]string{"unknown", "build"}), []*Rule{rule}) {
-		t.Error("Expected build rule to be selected")
-	}
-	if !reflect.DeepEqual(c.Rules(), []*Rule{rule}) {
-		t.Error("Expected build rule to be present")
-	}
+	assert.Equal(t, c.Select([]string{"unknown", "build"}), []*Rule{rule})
+	assert.Equal(t, c.Rules(), []*Rule{rule})
 
 	inputs, err := rule.Inputs()
 	if err != nil {
@@ -255,7 +253,7 @@ func TestComponentToolchain(t *testing.T) {
 		root:      dir,
 		rootAbs:   dir,
 		toolchain: map[string]string{},
-		executor:  NewBashExecutor(),
+		executor:  exec.NewBashExecutor(),
 	}
 	self := &definitions.Component{
 		Path: cDefPath,

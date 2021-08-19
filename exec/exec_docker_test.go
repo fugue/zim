@@ -1,6 +1,6 @@
 // +build dockertest
 
-package project
+package exec
 
 import (
 	"bytes"

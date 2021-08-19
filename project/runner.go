@@ -19,20 +19,14 @@ import (
 	"io"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/fugue/zim/exec"
 	"github.com/hashicorp/go-multierror"
 )
-
-var cmdColor *color.Color
-
-func init() {
-	cmdColor = color.New(color.FgMagenta)
-}
 
 // RunOpts contains options used to configure the running of Rules
 type RunOpts struct {
 	BuildID     string
-	Executor    Executor
+	Executor    exec.Executor
 	Output      io.Writer
 	DebugOutput io.Writer
 	Debug       bool
@@ -63,16 +57,16 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 
 	// Get a plain bash executor: either the provided one, or a newly created
 	// one if the provided one is dockerized.
-	var bashExecutor Executor
+	var bashExecutor exec.Executor
 	if opts.Executor != nil && !opts.Executor.UsesDocker() {
 		bashExecutor = opts.Executor
 	} else {
-		bashExecutor = NewBashExecutor()
+		bashExecutor = exec.NewBashExecutor()
 	}
 
 	// Determine the primary executor to be used for "run" commands.
 	// Use the provided one unless it conflicts in terms of native vs. docker.
-	var primaryExecutor Executor
+	var primaryExecutor exec.Executor
 	if opts.Executor == nil || (r.IsNative() && opts.Executor.UsesDocker()) {
 		primaryExecutor = bashExecutor
 	} else {
@@ -92,7 +86,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Any scripting done to check the condition will be via the bash executor.
 	conditionsMet, err := CheckConditions(ctx, r, opts, bashExecutor, bashEnv)
 	if err != nil {
-		return Error, fmt.Errorf("Error checking conditions on rule %s: %s", r.NodeID(), err)
+		return Error, fmt.Errorf("error checking conditions on rule %s: %s", r.NodeID(), err)
 	}
 	if !conditionsMet {
 		return Skipped, nil
@@ -109,13 +103,13 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 	// Execute each of the rule's commands
 	for i, cmd := range r.Commands() {
 		env := bashEnv
-		exec := bashExecutor
+		exc := bashExecutor
 		if cmd.Kind == "run" {
 			// Run commands use the primary environment and executor
 			env = primaryEnv
-			exec = primaryExecutor
+			exc = primaryExecutor
 		}
-		execOpts := ExecOpts{
+		execOpts := exec.ExecOpts{
 			WorkingDirectory: r.Component().Directory(),
 			Env:              flattenEnvironment(env),
 			Stdout:           opts.Output,
@@ -129,31 +123,31 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 		var execError error
 		switch cmd.Kind {
 		case "run":
-			execError = runner.execRunCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execRunCommand(ctx, r, exc, execOpts, cmd)
 		case "zip":
-			execError = runner.execZipCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execZipCommand(ctx, r, exc, execOpts, cmd)
 		case "unzip":
-			execError = runner.execUnzipCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execUnzipCommand(ctx, r, exc, execOpts, cmd)
 		case "archive":
-			execError = runner.execArchiveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execArchiveCommand(ctx, r, exc, execOpts, cmd)
 		case "unarchive":
-			execError = runner.execUnarchiveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execUnarchiveCommand(ctx, r, exc, execOpts, cmd)
 		case "mkdir":
-			execError = runner.execMkdirCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execMkdirCommand(ctx, r, exc, execOpts, cmd)
 		case "cleandir":
-			execError = runner.execCleandirCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execCleandirCommand(ctx, r, exc, execOpts, cmd)
 		case "remove":
-			execError = runner.execRemoveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execRemoveCommand(ctx, r, exc, execOpts, cmd)
 		case "move":
-			execError = runner.execMoveCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execMoveCommand(ctx, r, exc, execOpts, cmd)
 		case "copy":
-			execError = runner.execCopyCommand(ctx, r, exec, execOpts, cmd)
+			execError = runner.execCopyCommand(ctx, r, exc, execOpts, cmd)
 		default:
-			return Error, fmt.Errorf("Unknown command kind in %s: %s",
+			return Error, fmt.Errorf("unknown command kind in %s: %s",
 				r.NodeID(), cmd.Kind)
 		}
 		if execError != nil {
-			return ExecError, fmt.Errorf("Error running rule command. Rule: %s. Command: %+v. Error: %s",
+			return ExecError, fmt.Errorf("error running rule command. Rule: %s. Command: %+v. Error: %s",
 				r.NodeID(), cmd, execError)
 		}
 	}
@@ -178,7 +172,7 @@ func (runner *StandardRunner) Run(ctx context.Context, r *Rule, opts RunOpts) (C
 // the path within the Docker container, if Docker is being used.
 func (runner *StandardRunner) setArtifactVariables(
 	r *Rule,
-	executor Executor,
+	executor exec.Executor,
 	env map[string]string,
 ) error {
 	// Absolute path to the root of the project
@@ -214,8 +208,8 @@ func (runner *StandardRunner) setArtifactVariables(
 func (runner *StandardRunner) execRunCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	script := strings.TrimSpace(cmd.Argument)
@@ -232,8 +226,8 @@ func (runner *StandardRunner) execRunCommand(
 func (runner *StandardRunner) execZipCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-qrFS")
@@ -241,7 +235,7 @@ func (runner *StandardRunner) execZipCommand(
 	output := getCommandAttr(cmd, "output", "")
 	dir := getCommandAttr(cmd, "cd", "")
 	if output == "" {
-		return fmt.Errorf("Zip command has no output specified")
+		return fmt.Errorf("zip command has no output specified")
 	}
 	script := fmt.Sprintf("zip %s %s %s", opts, output, input)
 	if dir != "" {
@@ -255,15 +249,15 @@ func (runner *StandardRunner) execZipCommand(
 func (runner *StandardRunner) execUnzipCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-qo")
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Unzip command has no input specified")
+		return fmt.Errorf("unzip command has no input specified")
 	}
 	script := fmt.Sprintf("unzip %s %s", opts, input)
 	if output != "" {
@@ -278,18 +272,18 @@ func (runner *StandardRunner) execUnzipCommand(
 func (runner *StandardRunner) execArchiveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-czf")
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Archive command has no input specified")
+		return fmt.Errorf("archive command has no input specified")
 	}
 	if output == "" {
-		return fmt.Errorf("Archive command has no output specified")
+		return fmt.Errorf("archive command has no output specified")
 	}
 	execOpts.Command = fmt.Sprintf("tar %s %s %s", opts, output, input)
 	return executor.Execute(ctx, execOpts)
@@ -300,15 +294,15 @@ func (runner *StandardRunner) execArchiveCommand(
 func (runner *StandardRunner) execUnarchiveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	opts := getCommandAttr(cmd, "options", "-xzf")
 	input := getCommandAttr(cmd, "input", "")
 	output := getCommandAttr(cmd, "output", "")
 	if input == "" {
-		return fmt.Errorf("Archive command has no input specified")
+		return fmt.Errorf("archive command has no input specified")
 	}
 	script := fmt.Sprintf("tar %s %s", opts, input)
 	if output != "" {
@@ -322,8 +316,8 @@ func (runner *StandardRunner) execUnarchiveCommand(
 func (runner *StandardRunner) execMkdirCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -340,8 +334,8 @@ func (runner *StandardRunner) execMkdirCommand(
 func (runner *StandardRunner) execCleandirCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -359,8 +353,8 @@ func (runner *StandardRunner) execCleandirCommand(
 func (runner *StandardRunner) execRemoveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	arg := strings.TrimSpace(cmd.Argument)
@@ -375,17 +369,17 @@ func (runner *StandardRunner) execRemoveCommand(
 func (runner *StandardRunner) execMoveCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	src := getCommandAttr(cmd, "src", "")
 	dst := getCommandAttr(cmd, "dst", "")
 	if src == "" {
-		return fmt.Errorf("Move command has no src specified")
+		return fmt.Errorf("move command has no src specified")
 	}
 	if dst == "" {
-		return fmt.Errorf("Move command has no dst specified")
+		return fmt.Errorf("move command has no dst specified")
 	}
 	execOpts.Command = fmt.Sprintf("mv %s %s", src, dst)
 	return executor.Execute(ctx, execOpts)
@@ -395,18 +389,18 @@ func (runner *StandardRunner) execMoveCommand(
 func (runner *StandardRunner) execCopyCommand(
 	ctx context.Context,
 	r *Rule,
-	executor Executor,
-	execOpts ExecOpts,
+	executor exec.Executor,
+	execOpts exec.ExecOpts,
 	cmd *Command,
 ) error {
 	src := getCommandAttr(cmd, "src", "")
 	dst := getCommandAttr(cmd, "dst", "")
 	opts := getCommandAttr(cmd, "options", "-R")
 	if src == "" {
-		return fmt.Errorf("Copy command has no src specified")
+		return fmt.Errorf("copy command has no src specified")
 	}
 	if dst == "" {
-		return fmt.Errorf("Copy command has no dst specified")
+		return fmt.Errorf("copy command has no dst specified")
 	}
 	args := fmt.Sprintf("%s %s", src, dst)
 	if opts != "" {

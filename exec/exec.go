@@ -11,7 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package project
+
+package exec
 
 import (
 	"context"
@@ -19,6 +20,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -126,4 +128,17 @@ func getWriter(override, def io.Writer) io.Writer {
 		return override
 	}
 	return def
+}
+
+// XDGCache returns the local cache directory
+func XDGCache() string {
+	value := os.Getenv("XDG_CACHE_HOME")
+	if value != "" {
+		return value
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	return path.Join(home, ".cache")
 }

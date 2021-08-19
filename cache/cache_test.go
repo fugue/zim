@@ -21,6 +21,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 
 	"github.com/fugue/zim/definitions"
@@ -90,9 +91,9 @@ func TestCacheKey(t *testing.T) {
 		},
 	}
 
-	executor := &project.FakeExecutor{
+	executor := &exec.FakeExecutor{
 		Docker:  true,
-		Wrapped: project.NewBashExecutor(),
+		Wrapped: exec.NewBashExecutor(),
 	}
 
 	p, err := project.NewWithOptions(project.Opts{

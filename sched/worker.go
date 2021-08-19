@@ -17,6 +17,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/fugue/zim/exec"
 	"github.com/fugue/zim/project"
 )
 
@@ -33,7 +34,7 @@ func worker(
 	ctx context.Context,
 	runner project.Runner,
 	buildID string,
-	exec project.Executor,
+	exc exec.Executor,
 	rules <-chan *project.Rule,
 	results chan<- *workerResult,
 	wg *sync.WaitGroup) {
@@ -49,7 +50,7 @@ func worker(
 			}
 			code, err := runner.Run(ctx, rule, project.RunOpts{
 				BuildID:  buildID,
-				Executor: exec,
+				Executor: exc,
 			})
 			if ctx.Err() == nil {
 				results <- &workerResult{Rule: rule, Code: code, Error: err}
