@@ -236,6 +236,26 @@ rules:
     command: uname -a
 ```
 
+## Docker Platforms
+
+You may target different architectures using Docker's [multi-CPU architecture support](https://docs.docker.com/desktop/multi-arch). To set the Docker target platform, set `platform` in `~/.zim.yaml` as follows:
+
+```yaml
+platform: linux/amd64
+```
+
+Or use the command line flag:
+
+```shell
+$ zim run build --platform linux/amd64
+```
+
+You can list available platforms in Docker by running:
+
+```shell
+$ docker buildx ls
+```
+
 ## Rule Keys
 
 These keys are the basis for Zim caching. Zim uses SHA1 hashes to represent each

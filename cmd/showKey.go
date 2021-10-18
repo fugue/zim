@@ -60,7 +60,7 @@ func NewShowKeyCommand() *cobra.Command {
 
 			var executor exec.Executor
 			if opts.UseDocker {
-				executor = exec.NewDockerExecutor(opts.Directory)
+				executor = exec.NewDockerExecutor(opts.Directory, opts.Platform)
 			} else {
 				executor = exec.NewBashExecutor()
 			}

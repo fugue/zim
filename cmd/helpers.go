@@ -72,6 +72,7 @@ type zimOptions struct {
 	Jobs       int
 	CacheMode  string
 	Token      string
+	Platform   string
 }
 
 func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
@@ -89,6 +90,7 @@ func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 		Jobs:       viper.GetInt("jobs"),
 		CacheMode:  viper.GetString("cache"),
 		Token:      viper.GetString("token"),
+		Platform:   viper.GetString("platform"),
 	}
 	if opts.Cache == "" {
 		opts.Cache = XDGCache()
