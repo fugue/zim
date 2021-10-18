@@ -28,16 +28,25 @@ import (
 	"strings"
 
 	"github.com/fugue/zim/sign"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 type httpStore struct {
 	signingURL string
 	authToken  string
+	client     *retryablehttp.Client
 }
 
 // NewHTTP returns an HTTP storage interface
 func NewHTTP(signingURL, authToken string) Store {
-	return &httpStore{signingURL, authToken}
+	client := retryablehttp.NewClient()
+	client.RetryMax = 4
+	client.Logger = nil
+	return &httpStore{
+		signingURL: signingURL,
+		authToken:  authToken,
+		client:     client,
+	}
 }
 
 func (s *httpStore) request(ctx context.Context, url string, input *sign.Input, output interface{}) error {
@@ -46,27 +55,25 @@ func (s *httpStore) request(ctx context.Context, url string, input *sign.Input, 
 	}
 	js, err := json.Marshal(input)
 	if err != nil {
-		return fmt.Errorf("Failed to marshal request: %s", err)
+		return fmt.Errorf("failed to marshal request: %s", err)
 	}
-	cli := &http.Client{}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(js))
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", s.authToken))
 	if err != nil {
-		return fmt.Errorf("Failed to build request: %s", err)
+		return fmt.Errorf("failed to build request: %s", err)
 	}
-
-	resp, err := cli.Do(req)
+	resp, err := s.client.StandardClient().Do(req)
 	if err != nil {
-		return fmt.Errorf("Request failed: %s", err)
+		return fmt.Errorf("request failed: %s", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		errMessage, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("Request failed (%d): %s", resp.StatusCode, errMessage)
+		return fmt.Errorf("request failed (%d): %s", resp.StatusCode, errMessage)
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&output); err != nil {
-		return fmt.Errorf("Failed to decode response: %s", err)
+		return fmt.Errorf("failed to decode response: %s", err)
 	}
 	return nil
 }
@@ -108,18 +115,18 @@ func (s *httpStore) Get(ctx context.Context, key, dst string) error {
 
 	resp, err := http.Get(output.URL)
 	if err != nil {
-		return fmt.Errorf("Failed to build request: %s", err)
+		return fmt.Errorf("failed to build request: %s", err)
 	}
 	defer resp.Body.Close()
 
 	file, err := os.Create(dst)
 	if err != nil {
-		return fmt.Errorf("Failed to create file: %s", err)
+		return fmt.Errorf("failed to create file: %s", err)
 	}
 	defer file.Close()
 
 	if _, err := io.Copy(file, resp.Body); err != nil {
-		return fmt.Errorf("Failed to write file: %s", err)
+		return fmt.Errorf("failed to write file: %s", err)
 	}
 	return nil
 }
@@ -130,18 +137,18 @@ func (s *httpStore) Put(ctx context.Context, key, src string, meta map[string]st
 	input := sign.Input{Method: "PUT", Name: key, Metadata: meta}
 	output, err := s.requestSign(ctx, &input)
 	if err != nil {
-		return fmt.Errorf("Failed to sign PUT request %s: %s", src, err)
+		return fmt.Errorf("failed to sign PUT request %s: %s", src, err)
 	}
 
 	f, err := os.Open(src)
 	if err != nil {
-		return fmt.Errorf("Failed to open file %s: %s", src, err)
+		return fmt.Errorf("failed to open file %s: %s", src, err)
 	}
 	defer f.Close()
 
 	stat, err := f.Stat()
 	if err != nil {
-		return fmt.Errorf("Failed to stat file %s: %s", src, err)
+		return fmt.Errorf("failed to stat file %s: %s", src, err)
 	}
 
 	cli := &http.Client{}
@@ -153,11 +160,11 @@ func (s *httpStore) Put(ctx context.Context, key, src string, meta map[string]st
 	}
 
 	if err != nil {
-		return fmt.Errorf("Failed to create request: %s", err)
+		return fmt.Errorf("failed to create request: %s", err)
 	}
 	resp, err := cli.Do(req)
 	if err != nil {
-		return fmt.Errorf("Failed to make request: %s", err)
+		return fmt.Errorf("failed to make request: %s", err)
 	}
 	defer resp.Body.Close()
 
