@@ -34,7 +34,7 @@ import (
 const DefaultDockerExecutorDir = "/build"
 
 // NewDockerExecutor returns an Executor that runs commands within containers
-func NewDockerExecutor(mountDirectory string) Executor {
+func NewDockerExecutor(mountDirectory, platform string) Executor {
 
 	var userID, groupID string
 
@@ -48,6 +48,7 @@ func NewDockerExecutor(mountDirectory string) Executor {
 		UserID:         userID,
 		GroupID:        groupID,
 		ExecDirectory:  DefaultDockerExecutorDir,
+		Platform:       platform,
 	}
 }
 
@@ -56,6 +57,7 @@ type dockerExecutor struct {
 	UserID         string
 	GroupID        string
 	ExecDirectory  string
+	Platform       string
 }
 
 // Execute runs a command in a container
@@ -109,6 +111,9 @@ func (e *dockerExecutor) Execute(ctx context.Context, opts ExecOpts) error {
 	if os.Getenv("ZIM_DOCKER_IN_DOCKER") == "1" {
 		args = extendSlice(args, "--group-add", "root")
 		args = extendSlice(args, "--volume", "/var/run/docker.sock:/var/run/docker.sock")
+	}
+	if e.Platform != "" {
+		args = extendSlice(args, "--platform", e.Platform)
 	}
 	for _, envVar := range opts.Env {
 		args = extendSlice(args, "-e", envVar)

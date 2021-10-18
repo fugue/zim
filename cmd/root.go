@@ -50,6 +50,7 @@ func init() {
 	rootCmd.PersistentFlags().StringSliceP("rules", "r", nil, "Rules to run against components")
 	rootCmd.PersistentFlags().String("cache", "read-write", "Cache mode (read-write | write-only | disabled)")
 	rootCmd.PersistentFlags().String("output", "buffered", "Output mode (buffered | unbuffered)")
+	rootCmd.PersistentFlags().String("platform", "", "Docker target platform (linux/amd64, linux/arm64, ...)")
 
 	// Bind flags to environment variables if they are present
 	viper.BindPFlag("url", rootCmd.PersistentFlags().Lookup("url"))
@@ -62,6 +63,7 @@ func init() {
 	viper.BindPFlag("rules", rootCmd.PersistentFlags().Lookup("rules"))
 	viper.BindPFlag("cache", rootCmd.PersistentFlags().Lookup("cache"))
 	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
+	viper.BindPFlag("platform", rootCmd.PersistentFlags().Lookup("platform"))
 
 	// Flag completions
 	rootCmd.RegisterFlagCompletionFunc("components", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
