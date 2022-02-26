@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -73,9 +72,10 @@ type zimOptions struct {
 	CacheMode  string
 	Token      string
 	Platform   string
+	CachePath  string
 }
 
-func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
+func getZimOptions(cmd *cobra.Command, args []string) (zimOptions, error) {
 	opts := zimOptions{
 		Directory:  viper.GetString("dir"),
 		URL:        viper.GetString("url"),
@@ -91,10 +91,17 @@ func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 		CacheMode:  viper.GetString("cache"),
 		Token:      viper.GetString("token"),
 		Platform:   viper.GetString("platform"),
+		CachePath:  viper.GetString("cache-path"),
 	}
-	if opts.Cache == "" {
-		opts.Cache = XDGCache()
+	if opts.CachePath == "" {
+		opts.CachePath = LocalCacheDirectory()
 	}
+	absCachePath, err := filepath.Abs(opts.CachePath)
+	if err != nil {
+		return zimOptions{}, fmt.Errorf("unable to make cache path absolute: %w", err)
+	}
+	opts.CachePath = absCachePath
+
 	// Strip paths to components if provided, e.g. src/foo -> foo
 	for i, c := range opts.Components {
 		opts.Components[i] = filepath.Base(c)
@@ -104,28 +111,21 @@ func getZimOptions(cmd *cobra.Command, args []string) zimOptions {
 	if cmd.Name() == "run" && len(opts.Rules) == 0 && len(args) > 0 {
 		opts.Rules = args
 	}
-
-	return opts
+	return opts, nil
 }
 
-// XDGCache returns the local cache directory
-func XDGCache() string {
+// LocalCacheDirectory returns the directory in the local filesystem
+// to be used for caching
+func LocalCacheDirectory() string {
 	value := os.Getenv("XDG_CACHE_HOME")
 	if value != "" {
-		return value
+		return filepath.Join(value, "zim")
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
 	}
-	return path.Join(home, ".cache")
-}
-
-func fileExists(p string) bool {
-	if _, err := os.Stat(p); err == nil {
-		return true
-	}
-	return false
+	return filepath.Join(home, ".cache", "zim")
 }
 
 // repoRoot returns the root directory of the Git repository, given any
@@ -140,7 +140,7 @@ func repoRoot(dir string) (string, error) {
 	command.Stderr = &b
 
 	if err := command.Run(); err != nil {
-		return "", fmt.Errorf("Failed to run git rev-parse: %s", err)
+		return "", fmt.Errorf("failed to run git rev-parse: %s", err)
 	}
 	output := strings.TrimSpace(b.String())
 	if output == ".git" {

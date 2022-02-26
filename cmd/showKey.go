@@ -18,10 +18,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/user"
 	"strings"
 
 	"github.com/fugue/zim/cache"
 	"github.com/fugue/zim/exec"
+	"github.com/fugue/zim/hash"
 	"github.com/fugue/zim/project"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,7 +38,10 @@ func NewShowKeyCommand() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 
 			var ruleName, componentName string
-			opts := getZimOptions(cmd, args)
+			opts, err := getZimOptions(cmd, args)
+			if err != nil {
+				fatal(err)
+			}
 
 			if gitDir, err := gitRoot(opts.Directory); err == nil {
 				opts.Directory = gitDir
@@ -88,9 +93,17 @@ func NewShowKeyCommand() *cobra.Command {
 			if !found {
 				fatal(fmt.Errorf("Unknown rule: %s.%s", componentName, ruleName))
 			}
+			self, err := user.Current()
+			if err != nil {
+				fatal(err)
+			}
 
 			ctx := context.Background()
-			zimCache := cache.New(nil)
+			zimCache := cache.New(cache.Opts{
+				Store:  nil,
+				Hasher: hash.SHA1(),
+				User:   self.Name,
+			})
 			key, err := zimCache.Key(ctx, r)
 			if err != nil {
 				fatal(err)

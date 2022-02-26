@@ -67,7 +67,10 @@ func init() {
 
 	// Flag completions
 	rootCmd.RegisterFlagCompletionFunc("components", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)
@@ -85,7 +88,10 @@ func init() {
 	})
 
 	rootCmd.RegisterFlagCompletionFunc("kinds", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)
@@ -99,7 +105,10 @@ func init() {
 	})
 
 	rootCmd.RegisterFlagCompletionFunc("rules", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)

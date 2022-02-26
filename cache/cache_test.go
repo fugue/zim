@@ -65,14 +65,14 @@ func TestCacheKey(t *testing.T) {
 		Path:   cPath("component.yaml"),
 		Docker: definitions.Docker{Image: "repo/img:1.2.3"},
 		Rules: map[string]definitions.Rule{
-			"test": definitions.Rule{
+			"test": {
 				Description: "test it!",
 				Inputs:      []string{"${NAME}_test.go", "go.mod"},
 				Ignore:      []string{"exclude_me.go"},
 				Outputs:     []string{"test_results"},
 				Command:     "go test -v",
 			},
-			"build": definitions.Rule{
+			"build": {
 				Description: "build it!",
 				Inputs:      []string{"${NAME}.go", "go.mod"},
 				Ignore:      []string{"exclude_me.go"},
@@ -110,7 +110,7 @@ func TestCacheKey(t *testing.T) {
 	buildDeps := buildRule.Dependencies()
 	require.Len(t, buildDeps, 1)
 
-	cache := New(nil)
+	cache := New(Opts{})
 
 	key1, err := cache.Key(ctx, testRule)
 	require.Nil(t, err, "Error getting cache key")
@@ -149,7 +149,7 @@ func TestCacheKeyNonDocker(t *testing.T) {
 		Name: "my-component",
 		Path: path.Join(cDir, "component.yaml"),
 		Rules: map[string]definitions.Rule{
-			"test": definitions.Rule{
+			"test": {
 				Inputs:  []string{"main.go"},
 				Outputs: []string{"my-exe"},
 				Command: "touch my-exe",
@@ -170,7 +170,7 @@ func TestCacheKeyNonDocker(t *testing.T) {
 	require.NotNil(t, c)
 	testRule := c.MustRule("test")
 
-	cache := New(nil)
+	cache := New(Opts{})
 
 	key, err := cache.Key(ctx, testRule)
 	require.Nil(t, err, "Error getting cache key")
