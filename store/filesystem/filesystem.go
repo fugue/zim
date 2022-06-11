@@ -36,10 +36,27 @@ func New(rootDirectory string) store.Store {
 }
 
 func (s *fileStore) path(key string) string {
-	if len(key) > 2 {
+
+	// Use a nested subdirectory tree for the cache to help avoid
+	// having one folder with many 10s of thousands of files in it, since
+	// that can be difficult to navigate in file explorers and similar.
+
+	keyLen := len(key)
+
+	// Two levels of nesting, e.g. "abcd" is stored at "<cache>/ab/abcd"
+	if keyLen >= 4 {
+		prefix1 := key[:2]
+		prefix2 := key[2:4]
+		return filepath.Join(s.rootDirectory, prefix1, prefix2, key)
+	}
+
+	// One level of nesting, e.g. "abc" is stored at "<cache>/ab/abc"
+	if keyLen >= 2 {
 		prefix := key[:2]
 		return filepath.Join(s.rootDirectory, prefix, key)
 	}
+
+	// No nesting for short keys (uncommon)
 	return filepath.Join(s.rootDirectory, key)
 }
 
@@ -48,6 +65,9 @@ func (s *fileStore) Get(ctx context.Context, key, dst string) error {
 	path := s.path(key)
 	srcFile, err := os.Open(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("not found: %s", key)
+		}
 		return fmt.Errorf("failed to open file %s: %w", path, err)
 	}
 	defer srcFile.Close()
@@ -59,8 +79,6 @@ func (s *fileStore) Put(ctx context.Context, key, src string, meta map[string]st
 
 	path := s.path(key)
 	pathDir := filepath.Dir(path)
-
-	fmt.Println("PUT", path, pathDir, key)
 
 	if err := os.MkdirAll(pathDir, 0755); err != nil {
 		return err
@@ -114,7 +132,7 @@ func (s *fileStore) Head(ctx context.Context, key string) (store.ItemMeta, error
 	metaBytes, err := ioutil.ReadFile(metaPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return store.ItemMeta{}, store.NotFound(fmt.Sprintf("Not found: %s", key))
+			return store.ItemMeta{}, store.NotFound(fmt.Sprintf("not found: %s", key))
 		}
 		return store.ItemMeta{}, err
 	}

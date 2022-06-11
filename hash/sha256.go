@@ -15,10 +15,12 @@ func SHA256() Hasher {
 }
 
 func (hasher *sha256Hasher) Object(obj interface{}) (string, error) {
-	h := sha256.New()
-	if err := json.NewEncoder(h).Encode(obj); err != nil {
+	data, err := json.Marshal(obj)
+	if err != nil {
 		return "", err
 	}
+	h := sha256.New()
+	h.Write(data)
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
