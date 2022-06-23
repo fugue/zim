@@ -43,8 +43,8 @@ func TestMissingKey(t *testing.T) {
 // Confirm that a Get works on a file we put in the store manually
 func TestPresentKey(t *testing.T) {
 
-	inputFile := "test_fixture1.txt"
-	outputFile := "test_fixture1_output.txt"
+	inputFile := "test_fixture.txt"
+	outputFile := "tmp_output.txt"
 	key := "abcdef"
 
 	ctx := context.Background()
