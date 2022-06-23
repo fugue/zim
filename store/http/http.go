@@ -11,13 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package store
+
+package http
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/fugue/zim/sign"
+	"github.com/fugue/zim/store"
 	"github.com/hashicorp/go-retryablehttp"
 )
 
@@ -37,8 +38,8 @@ type httpStore struct {
 	client     *retryablehttp.Client
 }
 
-// NewHTTP returns an HTTP storage interface
-func NewHTTP(signingURL, authToken string) Store {
+// New returns an HTTP storage interface
+func New(signingURL, authToken string) store.Store {
 	client := retryablehttp.NewClient()
 	client.RetryMax = 4
 	client.Logger = nil
@@ -175,27 +176,15 @@ func (s *httpStore) Put(ctx context.Context, key, src string, meta map[string]st
 	return nil
 }
 
-// List contents of the Store
-func (s *httpStore) List(ctx context.Context, prefix string) ([]string, error) {
-	return []string{}, errors.New("Unimplemented")
-}
-
 // Head checks if the item exists in the store
-func (s *httpStore) Head(ctx context.Context, key string) (Item, error) {
+func (s *httpStore) Head(ctx context.Context, key string) (store.ItemMeta, error) {
 	input := sign.Input{Name: key}
 	output, err := s.requestHead(ctx, &input)
 	if err != nil {
-		return Item{}, err
+		return store.ItemMeta{}, err
 	}
 	if output.ETag == "" {
-		return Item{}, NotFound(fmt.Sprintf("Not found: %s", key))
+		return store.ItemMeta{}, store.NotFound(fmt.Sprintf("Not found: %s", key))
 	}
-	return Item{
-		Key:          output.Key,
-		Version:      output.Version,
-		ETag:         output.ETag,
-		Size:         output.Size,
-		LastModified: output.LastModified,
-		Meta:         output.Metadata,
-	}, nil
+	return store.ItemMeta{Meta: output.Metadata}, nil
 }

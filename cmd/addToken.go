@@ -34,7 +34,11 @@ func NewAddTokenCommand() *cobra.Command {
 		Short: "Add a cache token",
 		Run: func(cmd *cobra.Command, args []string) {
 
-			opts := getZimOptions(cmd, args)
+			opts, err := getZimOptions(cmd, args)
+			if err != nil {
+				fatal(err)
+			}
+
 			name := viper.GetString("name")
 			email := viper.GetString("email")
 

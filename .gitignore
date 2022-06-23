@@ -9,3 +9,4 @@ auth.zip
 samconfig.toml
 venv
 coverage.out
+store/filesystem/tmp*.txt

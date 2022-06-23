@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package cmd
 
 import (
@@ -25,9 +26,11 @@ import (
 
 	"github.com/fugue/zim/cache"
 	"github.com/fugue/zim/exec"
+	"github.com/fugue/zim/hash"
 	"github.com/fugue/zim/project"
 	"github.com/fugue/zim/sched"
-	"github.com/fugue/zim/store"
+	fsStore "github.com/fugue/zim/store/filesystem"
+	httpStore "github.com/fugue/zim/store/http"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -54,7 +57,10 @@ func NewRunCommand() *cobra.Command {
 			defer cancel()
 			closeHandler(cancel)
 
-			opts := getZimOptions(cmd, args)
+			opts, err := getZimOptions(cmd, args)
+			if err != nil {
+				fatal(err)
+			}
 
 			// If inside a git repo pick the root as the project directory
 			if repo, err := getRepository(opts.Directory); err == nil {
@@ -111,17 +117,33 @@ func NewRunCommand() *cobra.Command {
 
 			// Add caching middleware depending on configuration
 			if opts.CacheMode == cache.Disabled {
-				fmt.Fprintf(os.Stdout, project.Yellow("Caching is disabled.\n"))
+				fmt.Fprint(os.Stdout, project.Yellow("Caching is disabled.\n"))
 			} else if opts.URL != "" {
-				objStore := store.NewHTTP(opts.URL, opts.Token)
+				objStore := httpStore.New(opts.URL, opts.Token)
 				self, err := user.Current()
 				if err != nil {
 					fatal(err)
 				}
-				builders = append(builders,
-					cache.NewMiddleware(objStore, self.Name, opts.CacheMode))
+				cacheInterface := cache.New(cache.Opts{
+					Store:  objStore,
+					Hasher: hash.SHA1(),
+					User:   self.Name,
+				})
+				builders = append(builders, cache.NewMiddleware(cacheInterface))
+			} else if opts.CachePath != "" {
+				objStore := fsStore.New(opts.CachePath)
+				self, err := user.Current()
+				if err != nil {
+					fatal(err)
+				}
+				cacheInterface := cache.New(cache.Opts{
+					Store:  objStore,
+					Hasher: hash.SHA1(),
+					User:   self.Name,
+				})
+				builders = append(builders, cache.NewMiddleware(cacheInterface))
 			} else {
-				fmt.Fprintf(os.Stderr,
+				fmt.Fprint(os.Stderr,
 					project.Yellow("Cache URL is not set. See the docs!\n"))
 			}
 
@@ -161,7 +183,10 @@ func NewRunCommand() *cobra.Command {
 			}
 		},
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			opts := getZimOptions(cmd, args)
+			opts, err := getZimOptions(cmd, args)
+			if err != nil {
+				fatal(err)
+			}
 			proj, err := getProject(opts.Directory)
 			if err != nil {
 				fatal(err)

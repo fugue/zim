@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package cache
 
 import (
@@ -19,12 +20,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 
+	"github.com/fugue/zim/hash"
 	"github.com/fugue/zim/project"
 	"github.com/fugue/zim/store"
 )
@@ -48,108 +48,36 @@ func (e Error) Error() string { return string(e) }
 // CacheMiss indicates the cache did not contain a match
 const CacheMiss = Error("Item not found in cache")
 
-// Entry carries the name and hash for one item within a Key
-type Entry struct {
-	Name string `json:"name"`
-	Hash string `json:"hash"`
+// Opts defines options for initializing a Cache
+type Opts struct {
+	Store  store.Store
+	Hasher hash.Hasher
+	User   string
+	Mode   string
 }
 
-// command is the contribution to a cache key from a rule command
-type command struct {
-	Kind       string                 `json:"kind"`
-	Argument   string                 `json:"argument,omitempty"`
-	Attributes map[string]interface{} `json:"attributes,omitempty"`
-}
-
-func newEntry(name, hash string) *Entry {
-	return &Entry{Name: name, Hash: hash}
-}
-
-// Key contains information used to build a key
-type Key struct {
-	Project     string   `json:"project"`
-	Component   string   `json:"component"`
-	Rule        string   `json:"rule"`
-	Image       string   `json:"image"`
-	OutputCount int      `json:"output_count"`
-	Inputs      []*Entry `json:"inputs"`
-	Deps        []*Entry `json:"deps"`
-	Env         []*Entry `json:"env"`
-	Toolchain   []*Entry `json:"toolchain"`
-	Version     string   `json:"version"`
-	Commands    []string `json:"commands"`
-	Native      bool     `json:"native,omitempty"`
-	hex         string
-}
-
-// String returns the key as a hexadecimal string
-func (k *Key) String() string {
-	return k.hex
-}
-
-// Compute determines the hash for this key
-func (k *Key) Compute() error {
-	h := sha1.New()
-	if err := json.NewEncoder(h).Encode(k); err != nil {
-		return err
-	}
-	k.hex = hex.EncodeToString(h.Sum(nil))
-	return nil
-}
-
-// NewMiddleware returns caching middleware
-func NewMiddleware(s store.Store, user, mode string) project.RunnerBuilder {
-
-	c := New(s)
-	c.user = user
-	c.mode = mode
-
-	return project.RunnerBuilder(func(runner project.Runner) project.Runner {
-		return project.RunnerFunc(func(ctx context.Context, r *project.Rule, opts project.RunOpts) (project.Code, error) {
-
-			// Caching is only applicable for rules that have cacheable
-			// outputs. If this is not the case, run the rule normally.
-			outputs := r.Outputs()
-			if len(outputs) == 0 || !outputs[0].Cacheable() {
-				return runner.Run(ctx, r, opts)
-			}
-
-			if mode != WriteOnly {
-				// Download matching outputs from the cache if they exist
-				_, err := c.Read(ctx, r)
-				if err == nil {
-					return project.Cached, nil // Cache hit
-				}
-				if err != CacheMiss {
-					return project.Error, err // Cache error
-				}
-			}
-
-			// At this point, the outputs were not cached so build the rule
-			code, err := runner.Run(ctx, r, opts)
-
-			// Code "OK" indicates the rule was built which means we can
-			// store its outputs in the cache
-			if code == project.OK {
-				if _, err := c.Write(ctx, r); err != nil {
-					return project.Error, err
-				}
-			}
-			return code, err
-		})
-	})
-}
-
-// Cache used to determine rule keys
+// Cache for rule outputs
 type Cache struct {
-	store store.Store
-	user  string
-	mode  string
+	store  store.Store
+	hasher hash.Hasher
+	user   string
+	mode   string
 }
 
-// New returns a cache
-func New(s store.Store) *Cache {
-	return &Cache{store: s}
+// New returns a Cache
+func New(opts Opts) *Cache {
+
+	if opts.Hasher == nil {
+		opts.Hasher = hash.SHA1()
+	}
+
+	c := &Cache{
+		store:  opts.Store,
+		hasher: opts.Hasher,
+		user:   opts.User,
+		mode:   opts.Mode,
+	}
+	return c
 }
 
 // Write rule outputs to the cache
@@ -159,7 +87,7 @@ func (c *Cache) Write(ctx context.Context, r *project.Rule) ([]string, error) {
 
 	// If the rule has no outputs then there is nothing to cache
 	if len(outputs) == 0 {
-		return nil, fmt.Errorf("Rule has no outputs: %s", r.NodeID())
+		return nil, fmt.Errorf("rule has no outputs: %s", r.NodeID())
 	}
 
 	key, err := c.Key(ctx, r)
@@ -207,7 +135,7 @@ func (c *Cache) Read(ctx context.Context, r *project.Rule) ([]string, error) {
 
 	// If the rule has no outputs then there is nothing to read from the cache
 	if len(outputs) == 0 {
-		return nil, fmt.Errorf("Rule has no outputs: %s", r.NodeID())
+		return nil, fmt.Errorf("rule has no outputs: %s", r.NodeID())
 	}
 
 	key, err := c.Key(ctx, r)
@@ -237,7 +165,7 @@ func (c *Cache) Read(ctx context.Context, r *project.Rule) ([]string, error) {
 func (c *Cache) put(ctx context.Context, key, src string) error {
 
 	// The file hash will be added to the cache item metadata
-	hash, err := HashFile(src)
+	hash, err := c.hasher.File(src)
 	if err != nil {
 		return err
 	}
@@ -264,11 +192,12 @@ func (c *Cache) get(ctx context.Context, key, dst string) error {
 
 	// If a local file exists that is identical to the one in the cache,
 	// then there is nothing to do
-	if localHash, err := HashFile(dst); err == nil {
+	if localHash, err := c.hasher.File(dst); err == nil {
 		if remoteHash == localHash {
 			return nil
 		}
 	}
+
 	// Download the file from the cache
 	return c.store.Get(ctx, key, dst)
 }
@@ -328,7 +257,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 
 	// Include the hash of every input file in the key
 	for _, input := range inputs.Paths() {
-		hash, err := c.hashFile(input)
+		hash, err := c.hasher.File(input)
 		if err != nil {
 			return nil, err
 		}
@@ -342,7 +271,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 
 	// Include rule environment variables in the key
 	for _, k := range MapKeys(env) {
-		hash, err := c.hashString(env[k])
+		hash, err := c.hasher.String(env[k])
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +303,7 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 			// For new built-in commands, reduce the command to a hash.
 			hashStr, err := HashCommand(cmd)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to hash command: %s", err)
+				return nil, fmt.Errorf("failed to hash command: %s", err)
 			}
 			key.Commands = append(key.Commands, hashStr)
 		}
@@ -387,19 +316,17 @@ func (c *Cache) buildKey(ctx context.Context, r *project.Rule) (*Key, error) {
 	return key, nil
 }
 
-// hashFile returns the SHA1 hash of a given file
-func (c *Cache) hashFile(p string) (string, error) {
-	// No caching for now
-	return HashFile(p)
+// MapKeys returns a sorted slice containing all keys from the given map
+func MapKeys(m map[string]string) (result []string) {
+	result = make([]string, 0, len(m))
+	for k := range m {
+		result = append(result, k)
+	}
+	sort.Strings(result)
+	return
 }
 
-// hashString returns the SHA1 hash of a given string
-func (c *Cache) hashString(s string) (string, error) {
-	// No caching for now
-	return HashString(s)
-}
-
-// HashCommand returns a SHA1 hash of the command configuration
+// Command returns a SHA1 hash of the command configuration
 func HashCommand(cmd *project.Command) (string, error) {
 	entry := &command{
 		Kind:       cmd.Kind,
@@ -411,67 +338,4 @@ func HashCommand(cmd *project.Command) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// HashFile returns the SHA1 hash of file contents
-func HashFile(filePath string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-	h := sha1.New()
-	if _, err := io.Copy(h, file); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// HashString returns the SHA1 hash of a string
-func HashString(s string) (string, error) {
-	h := sha1.New()
-	if _, err := h.Write([]byte(s)); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// MapKeys returns a sorted slice containing all keys from the given map
-func MapKeys(m map[string]string) (result []string) {
-	result = make([]string, 0, len(m))
-	for k := range m {
-		result = append(result, k)
-	}
-	sort.Strings(result)
-	return
-}
-
-func writeJSON(key *Key) (string, error) {
-	js, err := json.Marshal(key)
-	if err != nil {
-		return "", err
-	}
-	f, err := ioutil.TempFile("", "zim-key-")
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	if _, err := f.Write(js); err != nil {
-		return "", err
-	}
-	return f.Name(), nil
-}
-
-func writeKey(path string, key *Key) error {
-	js, err := json.Marshal(key)
-	if err != nil {
-		return err
-	}
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.Write(js)
-	return err
 }

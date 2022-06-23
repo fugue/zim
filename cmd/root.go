@@ -16,6 +16,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -67,7 +68,10 @@ func init() {
 
 	// Flag completions
 	rootCmd.RegisterFlagCompletionFunc("components", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)
@@ -85,7 +89,10 @@ func init() {
 	})
 
 	rootCmd.RegisterFlagCompletionFunc("kinds", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)
@@ -99,7 +106,10 @@ func init() {
 	})
 
 	rootCmd.RegisterFlagCompletionFunc("rules", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		opts := getZimOptions(cmd, args)
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
 		proj, err := getProject(opts.Directory)
 		if err != nil {
 			fatal(err)
@@ -128,5 +138,6 @@ func initConfig() {
 	viper.SetConfigName(".zim")
 
 	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.ReadInConfig()
 }

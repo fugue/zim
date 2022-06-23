@@ -32,12 +32,17 @@ var listEnvCmd = &cobra.Command{
 	Short: "List zim environment and configuration",
 	Run: func(cmd *cobra.Command, args []string) {
 
+		opts, err := getZimOptions(cmd, args)
+		if err != nil {
+			fatal(err)
+		}
+
 		defaultCols := []string{
 			"Key",
 			"Value",
 		}
 
-		fields := structs.Map(getZimOptions(cmd, args))
+		fields := structs.Map(opts)
 
 		var rows []interface{}
 		for _, k := range []string{"URL", "Region", "Debug", "Jobs", "UseDocker"} {
