@@ -4,7 +4,7 @@ go 1.12
 
 require (
 	github.com/aws/aws-lambda-go v1.13.3
-	github.com/aws/aws-sdk-go v1.25.25
+	github.com/aws/aws-sdk-go v1.34.0
 	github.com/bmatcuk/doublestar v1.1.5
 	github.com/fatih/color v1.7.0
 	github.com/fatih/structs v1.1.0
